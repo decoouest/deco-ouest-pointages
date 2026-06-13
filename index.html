@@ -761,17 +761,32 @@ async function sauvegarder() {
     }
   }
 
-  // 3. Envoyer la photo via POST (CORS OK depuis GitHub Pages)
+  // 3. Envoyer la photo via POST
   if (selectedPhoto) {
     btn.textContent = 'Envoi photo...';
-    const r3 = await apiPost({
-      action: 'saisir_photo',
-      salarie: currentSalarie,
-      row: currentSaisieRow.row,
-      imageBase64: selectedPhoto,
-    });
-    if (!r3 || !r3.ok) {
-      showToast('⚠️ Heures OK mais photo échouée : ' + (r3?.error || ''));
+    try {
+      const sizeKB = Math.round(selectedPhoto.length * 0.75 / 1024);
+      showToast('📤 Envoi photo ' + sizeKB + ' KB...', 4000);
+      const r3 = await apiPost({
+        action: 'saisir_photo',
+        salarie: currentSalarie,
+        row: currentSaisieRow.row,
+        imageBase64: selectedPhoto,
+      });
+      if (!r3) {
+        showToast('❌ Photo : pas de réponse du serveur', 5000);
+        btn.disabled = false;
+        btn.textContent = 'Enregistrer dans Sheets';
+        return;
+      }
+      if (!r3.ok) {
+        showToast('❌ Photo erreur : ' + JSON.stringify(r3), 6000);
+        btn.disabled = false;
+        btn.textContent = 'Enregistrer dans Sheets';
+        return;
+      }
+    } catch(err) {
+      showToast('❌ Photo exception : ' + err.message, 6000);
       btn.disabled = false;
       btn.textContent = 'Enregistrer dans Sheets';
       return;
@@ -881,7 +896,7 @@ function setStatus(msg) {
   document.getElementById('nav-status').textContent = msg;
 }
 
-function showToast(msg, duration=2500) {
+function showToast(msg, duration=3000) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
