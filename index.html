@@ -858,19 +858,22 @@ async function loadRecap(sal) {
     html += `<td>TOTAL</td><td>${t.hSupMaj}</td><td>${t.jRtt}j</td><td>${t.jAbsent}j</td><td class="${t.net?.startsWith('-')?'neg':'pos'}">${t.net}</td><td>${t.conges}j</td>`;
   } else {
     // Calculer totaux depuis les lignes mois côté HTML
-    function hhmToMin(str) {
-      if (!str || str==='0:00' || str==='0:00:00') return 0;
-      const p = str.split(':'); return parseInt(p[0]||0)*60+parseInt(p[1]||0);
+    // Calculer totaux Antonio depuis les lignes mois
+    let _jAbs=0, _minHAbs=0, _jWe=0, _minHWe=0, _cong=0;
+    for (const m of data.mois) {
+      if (m.mois === 'Mois') continue;
+      _jAbs  += parseInt(m.jAbsent) || 0;
+      _jWe   += parseInt(m.jWeTrav) || 0;
+      _cong  += parseInt(m.conges)  || 0;
+      // Parser HH:MM
+      const pA = (m.hAbsent||'0:00').split(':');
+      _minHAbs += (parseInt(pA[0])||0)*60 + (parseInt(pA[1])||0);
+      const pW = (m.hWeTrav||'0:00').split(':');
+      _minHWe  += (parseInt(pW[0])||0)*60 + (parseInt(pW[1])||0);
     }
-    function minToHhm(min) {
-      return Math.floor(min/60)+':'+(min%60).toString().padStart(2,'0');
-    }
-    const totJAbs   = data.mois.reduce((s,m)=>s+(m.jAbsent||0),0);
-    const totHAbs   = minToHhm(data.mois.reduce((s,m)=>s+hhmToMin(m.hAbsent),0));
-    const totJWe    = data.mois.reduce((s,m)=>s+(m.jWeTrav||0),0);
-    const totHWe    = minToHhm(data.mois.reduce((s,m)=>s+hhmToMin(m.hWeTrav),0));
-    const totConges = data.mois.reduce((s,m)=>s+(m.conges||0),0);
-    html += `<td>TOTAL</td><td>${totJAbs}j</td><td>${totHAbs}</td><td>${totJWe}j</td><td>${totHWe}</td><td>${totConges}j</td>`;
+    const _totHAbs = Math.floor(_minHAbs/60)+':'+((_minHAbs%60).toString().padStart(2,'0'));
+    const _totHWe  = Math.floor(_minHWe/60)+':'+((_minHWe%60).toString().padStart(2,'0'));
+    html += `<td>TOTAL</td><td>${_jAbs}j</td><td>${_totHAbs}</td><td>${_jWe}j</td><td>${_totHWe}</td><td>${_cong}j</td>`;
   }
   html += '</tr></tbody></table></div>';
 
