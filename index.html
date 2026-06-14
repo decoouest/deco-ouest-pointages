@@ -695,8 +695,8 @@ function previewPhoto(input) {
     const img = new Image();
     img.onload = function() {
       const canvas = document.createElement('canvas');
-      // Taille moyenne pour bon compromis qualité/taille
-      const MAX = 400;
+      // Bonne qualité - stockage chunks corrigé, peut gérer plus gros
+      const MAX = 500;
       let w = img.width, h = img.height;
       if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
       else { w = Math.round(w * MAX / h); h = MAX; }
@@ -704,8 +704,7 @@ function previewPhoto(input) {
       canvas.height = h;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, w, h);
-      // Qualité moyenne
-      const compressed = canvas.toDataURL('image/jpeg', 0.6);
+      const compressed = canvas.toDataURL('image/jpeg', 0.65);
       
       // Afficher aperçu (original pour la préview)
       document.getElementById('photo-img').src = e.target.result;
@@ -763,13 +762,13 @@ async function sauvegarder() {
   if (selectedPhoto) {
     btn.textContent = 'Envoi photo...';
     try {
-      const CHUNK = 1000; // 1000 chars par chunk = URL ~1200 chars, très sûr
+      const CHUNK = 1500; // 1500 chars par chunk = URL ~1800 chars
       const total = Math.ceil(selectedPhoto.length / CHUNK);
       let photoOk = true;
 
       for (let i = 0; i < total; i++) {
         const chunk = selectedPhoto.substring(i * CHUNK, (i+1) * CHUNK);
-        if (total > 1) btn.textContent = '📤 ' + (i+1) + '/' + total;
+        if (total > 1) btn.textContent = '📤 Envoi ' + Math.round((i+1)/total*100) + '%';
         const r3 = await apiGet({
           action: 'saisir_photo_chunk',
           salarie: currentSalarie,
@@ -855,7 +854,9 @@ async function loadRecap(sal) {
   const t = data.total;
   html += '<tr>';
   if (!isAntonio) {
-    html += `<td>TOTAL</td><td>${t.hSupMaj}</td><td>${t.jRtt}j</td><td>${t.jAbsent}j</td><td class="${t.net?.startsWith('-')?'neg':'pos'}">${t.net}</td><td>${t.conges}j</td>`;
+    // Calculer le total congés en sommant les mois (la case TOTAL du Sheets peut être vide)
+    const totConges = data.mois.reduce((s,m) => s + (parseInt(m.conges) || 0), 0);
+    html += `<td>TOTAL</td><td>${t.hSupMaj}</td><td>${t.jRtt}j</td><td>${t.jAbsent}j</td><td class="${t.net?.startsWith('-')?'neg':'pos'}">${t.net}</td><td>${totConges}j</td>`;
   } else {
     // Calculer totaux depuis les lignes mois côté HTML
     // Calculer totaux Antonio depuis les lignes mois
