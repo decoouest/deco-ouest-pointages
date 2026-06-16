@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1565C0">
@@ -149,6 +149,24 @@ td.pos { color: var(--green); font-weight: 600; }
 .date-picker-input { flex: 1; padding: 10px 12px; border: 2px solid #E0E0E0; border-radius: 10px; font-size: 14px; background: white; }
 .date-picker-input:focus { outline: none; border-color: var(--blue); }
 
+/* MENSUEL */
+.mens-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.mens-table th { background: var(--blue); color: white; padding: 6px 4px; text-align: center; font-size: 10px; }
+.mens-table td { padding: 5px 4px; border-bottom: 1px solid #F0F0F0; text-align: center; }
+.mens-table tr.weekend td { background: #F5F7FA; color: #90A4AE; }
+.mens-table tr.today-row td { background: #E3F2FD; font-weight: 700; }
+.mens-table tr.travaille td { }
+.mens-table tr.conge td { background: #E8F5E9; }
+.mens-table tr.absent td { background: var(--red-l); }
+.mens-table tr.rtt td { background: #F3E5F5; }
+.mens-table tr.ferie td { background: #FFF9C4; }
+.mens-table .type-badge { font-size: 9px; color: var(--text2); }
+.mens-total { display: flex; gap: 8px; margin-top: 8px; }
+.mens-total-card { flex: 1; background: white; border-radius: 10px; padding: 8px;
+                   box-shadow: var(--shadow); text-align: center; }
+.mens-total-card .val { font-size: 16px; font-weight: 700; color: var(--blue); }
+.mens-total-card .lbl { font-size: 10px; color: var(--text2); }
+
 /* CALENDRIER */
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .cal-head { text-align: center; font-size: 10px; font-weight: 700; color: var(--text2);
@@ -193,6 +211,9 @@ td.pos { color: var(--green); font-weight: 600; }
     </button>
     <button class="tab-btn" onclick="goTab('semaine',this)">
       <i>📅</i>Semaine
+    </button>
+    <button class="tab-btn" onclick="goTab('mensuel',this)">
+      <i>📆</i>Mensuel
     </button>
     <button class="tab-btn" onclick="goTab('recap',this)">
       <i>📋</i>Récap
@@ -290,6 +311,37 @@ td.pos { color: var(--green); font-weight: 600; }
 
       <button class="btn-save" id="btn-save" onclick="sauvegarder()" disabled>Enregistrer dans Sheets</button>
     </div>
+  </div>
+</div>
+
+<!-- PAGE MENSUEL -->
+<div id="page-mensuel" class="page">
+  <div class="sal-picker">
+    <button class="sal-btn anatole active" onclick="setMensSal('ANATOLE',this)">Anatole</button>
+    <button class="sal-btn artiom"         onclick="setMensSal('ARTIOM',this)">Artiom</button>
+    <button class="sal-btn antonio"        onclick="setMensSal('ANTONIO',this)">Antonio</button>
+  </div>
+
+  <!-- Navigation mois -->
+  <div class="week-nav">
+    <button class="week-nav-btn" onclick="changeMensMonth(-1)">‹</button>
+    <div class="week-label">
+      <div class="week-label-main" id="mens-month-label">Mois en cours</div>
+      <div class="week-label-sub" id="mens-month-sub"></div>
+    </div>
+    <button class="week-nav-btn today-btn" onclick="goToMensToday()">Auj.</button>
+    <button class="week-nav-btn" onclick="changeMensMonth(1)">›</button>
+  </div>
+
+  <div id="mensuel-content">
+    <div class="loader"><div class="spinner"></div><div class="loader-text">Chargement...</div></div>
+  </div>
+
+  <!-- Bouton PDF -->
+  <div style="margin-top:10px">
+    <button class="btn-save" id="btn-pdf-mensuel" onclick="telechargerPdfMensuel()">
+      📄 Télécharger le mois en PDF
+    </button>
   </div>
 </div>
 
@@ -396,6 +448,314 @@ async function telechargerPdfSalarie() {
   } finally {
     btn.disabled = false;
     btn.textContent = original;
+  }
+}
+
+// ── MENSUEL ────────────────────────────────────────────────────
+let currentMensSalarie = 'ANATOLE';
+let currentMensMonthOffset = 0;
+
+function setMensSal(nom, btn) {
+  currentMensSalarie = nom;
+  document.querySelectorAll('#page-mensuel .sal-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  loadMensuel();
+}
+
+function changeMensMonth(delta) {
+  currentMensMonthOffset += delta;
+  loadMensuel();
+}
+
+function goToMensToday() {
+  currentMensMonthOffset = 0;
+  loadMensuel();
+}
+
+async function loadMensuel() {
+  const el = document.getElementById('mensuel-content');
+  if (!API_URL) {
+    el.innerHTML = '<div class="empty">⚙️ Configurez l'URL Apps Script</div>';
+    return;
+  }
+  el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Chargement du mois...</div></div>';
+
+  const now = new Date();
+  const target = new Date(now.getFullYear(), now.getMonth() + currentMensMonthOffset, 1);
+  const moisNom = target.toLocaleDateString('fr-FR', {month:'long', year:'numeric'});
+
+  document.getElementById('mens-month-label').textContent =
+    moisNom.charAt(0).toUpperCase() + moisNom.slice(1);
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayMonday = new Date(today);
+  todayMonday.setDate(today.getDate() - ((today.getDay()+6)%7));
+
+  const firstDay = new Date(target.getFullYear(), target.getMonth(), 1);
+  const lastDay  = new Date(target.getFullYear(), target.getMonth()+1, 0);
+
+  const firstMonday = new Date(firstDay);
+  firstMonday.setDate(firstDay.getDate() - ((firstDay.getDay()+6)%7));
+
+  // Récupérer toutes les semaines du mois
+  const mondays = [];
+  let cursor = new Date(firstMonday);
+  while (cursor <= lastDay) {
+    mondays.push(new Date(cursor));
+    cursor.setDate(cursor.getDate()+7);
+  }
+
+  const allJours = [];
+  for (const m of mondays) {
+    const diffDays = Math.round((m - todayMonday) / (1000*60*60*24));
+    const offset = Math.round(diffDays/7);
+    const data = await apiGet({action:'semaine', salarie: currentMensSalarie, offset: offset});
+    if (data && data.semaine) {
+      for (const j of data.semaine) {
+        const [dd, mm] = j.date.split('/').map(Number);
+        if (mm - 1 === target.getMonth()) allJours.push(j);
+      }
+    }
+  }
+
+  renderMensuel(allJours, currentMensSalarie, moisNom);
+}
+
+function renderMensuel(jours, sal, moisNom) {
+  const el = document.getElementById('mensuel-content');
+  const BASE = sal === 'ANTONIO' ? 39 : 35;
+
+  let totalTravMin = 0, totalEcartMin = 0, totalMajMin = 0;
+  let nbTrav = 0, nbAbs = 0, nbRtt = 0, nbConge = 0;
+
+  let rows = '';
+  for (const j of jours) {
+    const type = j.type || '';
+    const isTrav = type === 'Jour Travaillé' || type === 'journee solidarité travaillé';
+    const isWeekend = type === 'week end';
+    const isConge = type === 'CONGE';
+    const isRtt = type === 'RTT';
+    const isAbsent = type === 'ABSENT' || type === 'ARRET TRAVAIL MALADIE';
+    const isFerie = type === 'JOUR FERIE non travaillé';
+
+    let rowClass = '';
+    if (isWeekend) rowClass = 'weekend';
+    else if (j.isToday) rowClass = 'today-row';
+    else if (isConge) rowClass = 'conge';
+    else if (isRtt) rowClass = 'rtt';
+    else if (isAbsent) rowClass = 'absent';
+    else if (isFerie) rowClass = 'ferie';
+
+    if (isTrav) {
+      nbTrav++;
+      if (j.travaille) totalTravMin += parseDisplayDuration(j.travaille);
+      if (j.ecart) totalEcartMin += parseDisplayDuration(j.ecart);
+    }
+    if (isAbsent) nbAbs++;
+    if (isRtt) nbRtt++;
+    if (isConge) nbConge++;
+
+    const travStr = isTrav && j.travaille ? cleanTime(j.travaille) : '—';
+    const ecartStr = isTrav && j.ecart && j.ecart !== '0:00' ? cleanTime(j.ecart) : '—';
+    const ecartClass = isTrav && j.ecart ? (j.ecart.startsWith('-') ? 'style="color:var(--red)"' : 'style="color:var(--green)"') : '';
+
+    const [dd, mm] = j.date.split('/');
+    const jourCourt = j.jour ? j.jour.substring(0,3) : '';
+
+    rows += `<tr class="${rowClass}">
+      <td><strong>${dd}/${mm}</strong></td>
+      <td>${jourCourt}</td>
+      <td class="type-badge">${typeLabel(type)}</td>
+      <td>${travStr}</td>
+      <td ${ecartClass}>${ecartStr}</td>
+      ${sal !== 'ANTONIO' ? `<td style="color:var(--blue)">${isTrav && j.travaille ? majStr(parseDisplayDuration(j.travaille), BASE) : '—'}</td>` : ''}
+    </tr>`;
+  }
+
+  // Total
+  if (sal !== 'ANTONIO') {
+    const excessMin = totalTravMin - BASE * 60 * nbTrav / 5;
+    totalMajMin = excessMin > 0 ? Math.round(excessMin * 1.25) : 0;
+  }
+
+  const header = sal === 'ANTONIO'
+    ? '<tr><th>Date</th><th>Jour</th><th>Type</th><th>Travaillé</th><th>Écart</th></tr>'
+    : '<tr><th>Date</th><th>Jour</th><th>Type</th><th>Travaillé</th><th>Écart</th><th>Maj.25%</th></tr>';
+
+  let html = `<div class="card" style="overflow-x:auto">
+    <table class="mens-table">${header}${rows}</table>
+  </div>
+  <div class="mens-total">
+    <div class="mens-total-card"><div class="val">${minsToStr2(totalTravMin)}</div><div class="lbl">H. travaillées</div></div>
+    <div class="mens-total-card"><div class="val" style="color:${totalEcartMin>=0?'var(--green)':'var(--red)'}">${minsToStr2(totalEcartMin)}</div><div class="lbl">Écart / base</div></div>
+    ${sal !== 'ANTONIO' ? `<div class="mens-total-card"><div class="val" style="color:var(--blue)">${minsToStr2(totalMajMin)}</div><div class="lbl">Maj. 25%</div></div>` : ''}
+    <div class="mens-total-card"><div class="val">${nbConge + nbRtt}</div><div class="lbl">J. Abs/CP/RTT</div></div>
+  </div>`;
+
+  el.innerHTML = html;
+}
+
+function typeLabel(type) {
+  if (!type) return '—';
+  if (type === 'Jour Travaillé') return 'Travaillé';
+  if (type === 'journee solidarité travaillé') return 'Solidarité';
+  if (type === 'week end') return 'W-E';
+  if (type === 'CONGE') return 'Congé';
+  if (type === 'RTT') return 'RTT';
+  if (type === 'ABSENT') return 'Absent';
+  if (type === 'JOUR FERIE non travaillé') return 'Férié';
+  if (type === 'ARRET TRAVAIL MALADIE') return 'Maladie';
+  return type.substring(0, 12);
+}
+
+function majStr(travMin, base) {
+  const baseMin = base * 60 / 5;
+  const excess = travMin - baseMin;
+  if (excess <= 0) return '—';
+  return '+' + minsToStr2(Math.round(excess * 1.25));
+}
+
+function minsToStr2(mins) {
+  const neg = mins < 0;
+  const abs = Math.abs(mins);
+  const h = Math.floor(abs/60);
+  const m = abs%60;
+  return (neg?'-':'') + h + ':' + String(m).padStart(2,'0');
+}
+
+// ── PDF MENSUEL ────────────────────────────────────────────────
+async function telechargerPdfMensuel() {
+  const btn = document.getElementById('btn-pdf-mensuel');
+  btn.disabled = true;
+  btn.textContent = '⏳ Génération...';
+
+  try {
+    const now = new Date();
+    const target = new Date(now.getFullYear(), now.getMonth() + currentMensMonthOffset, 1);
+    const moisNom = target.toLocaleDateString('fr-FR', {month:'long', year:'numeric'});
+    const moisIdx = target.getMonth();
+    const annee   = target.getFullYear();
+
+    // Récupérer toutes les semaines du mois
+    const today = new Date(); today.setHours(0,0,0,0);
+    const todayMonday = new Date(today);
+    todayMonday.setDate(today.getDate() - ((today.getDay()+6)%7));
+
+    const firstDay = new Date(annee, moisIdx, 1);
+    const lastDay  = new Date(annee, moisIdx+1, 0);
+    const firstMonday = new Date(firstDay);
+    firstMonday.setDate(firstDay.getDate() - ((firstDay.getDay()+6)%7));
+
+    const mondays = [];
+    let cursor = new Date(firstMonday);
+    while (cursor <= lastDay) {
+      mondays.push(new Date(cursor));
+      cursor.setDate(cursor.getDate()+7);
+    }
+
+    const allJours = [];
+    for (const m of mondays) {
+      const diffDays = Math.round((m - todayMonday) / (1000*60*60*24));
+      const offset = Math.round(diffDays/7);
+      const data = await apiGet({action:'semaine', salarie: currentMensSalarie, offset: offset});
+      if (data && data.semaine) {
+        for (const j of data.semaine) {
+          const [dd, mm] = j.date.split('/').map(Number);
+          if (mm - 1 === moisIdx) allJours.push(j);
+        }
+      }
+    }
+
+    // Construire HTML pour le PDF
+    const sal = currentMensSalarie;
+    const BASE = sal === 'ANTONIO' ? 39 : 35;
+    let totalTravMin = 0, totalEcartMin = 0;
+    let nbConge = 0, nbRtt = 0, nbAbs = 0;
+
+    let rows = '';
+    for (const j of allJours) {
+      const type = j.type || '';
+      const isTrav = type === 'Jour Travaillé' || type === 'journee solidarité travaillé';
+      const isConge = type === 'CONGE';
+      const isRtt = type === 'RTT';
+      const isAbsent = type === 'ABSENT' || type === 'ARRET TRAVAIL MALADIE';
+      const isWeekend = type === 'week end';
+
+      let bg = '';
+      if (isWeekend) bg = 'background:#F5F7FA;color:#90A4AE;';
+      else if (isConge) bg = 'background:#E8F5E9;';
+      else if (isRtt) bg = 'background:#F3E5F5;';
+      else if (isAbsent) bg = 'background:#FFEBEE;';
+      else if (type === 'JOUR FERIE non travaillé') bg = 'background:#FFF9C4;';
+
+      if (isTrav) {
+        if (j.travaille) totalTravMin += parseDisplayDuration(j.travaille);
+        if (j.ecart) totalEcartMin += parseDisplayDuration(j.ecart);
+      }
+      if (isConge) nbConge++;
+      if (isRtt) nbRtt++;
+      if (isAbsent) nbAbs++;
+
+      const [dd, mm] = j.date.split('/');
+      rows += `<tr style="${bg}">
+        <td>${dd}/${mm}</td>
+        <td>${j.jour||''}</td>
+        <td>${typeLabel(type)}</td>
+        <td>${isTrav && j.travaille ? cleanTime(j.travaille) : '—'}</td>
+        <td style="color:${isTrav && j.ecart && j.ecart.startsWith('-')?'#C62828':'#2E7D32'}">${isTrav && j.ecart ? cleanTime(j.ecart) : '—'}</td>
+      </tr>`;
+    }
+
+    const pdfHtml = `<html><head><meta charset="utf-8"><style>
+      body{font-family:Arial,sans-serif;font-size:11px;color:#263238}
+      h1{color:#1565C0;font-size:18px;margin-bottom:4px}
+      .sub{color:#607D8B;font-size:12px;margin-bottom:16px}
+      table{width:100%;border-collapse:collapse}
+      th{background:#1565C0;color:white;padding:6px 8px;font-size:10px;text-align:center}
+      td{padding:5px 8px;border-bottom:1px solid #E0E0E0;text-align:center;font-size:10px}
+      .totaux{margin-top:12px;display:flex;gap:16px}
+      .tot{flex:1;background:#F5F7FA;padding:8px;border-radius:6px;text-align:center}
+      .tot .v{font-size:15px;font-weight:700;color:#1565C0}
+      .tot .l{font-size:9px;color:#607D8B}
+    </style></head><body>
+    <h1>D ECO OUEST — ${sal} — ${moisNom.charAt(0).toUpperCase()+moisNom.slice(1)}</h1>
+    <div class="sub">Rapport mensuel généré le ${new Date().toLocaleDateString('fr-FR')}</div>
+    <table>
+      <tr><th>Date</th><th>Jour</th><th>Type</th><th>Travaillé</th><th>Écart</th></tr>
+      ${rows}
+    </table>
+    <div class="totaux">
+      <div class="tot"><div class="v">${minsToStr2(totalTravMin)}</div><div class="l">H. travaillées</div></div>
+      <div class="tot"><div class="v" style="color:${totalEcartMin>=0?'#2E7D32':'#C62828'}">${minsToStr2(totalEcartMin)}</div><div class="l">Écart / base</div></div>
+      <div class="tot"><div class="v">${nbConge}</div><div class="l">J. Congés</div></div>
+      <div class="tot"><div class="v">${nbRtt}</div><div class="l">J. RTT</div></div>
+      <div class="tot"><div class="v">${nbAbs}</div><div class="l">J. Absence</div></div>
+    </div>
+    </body></html>`;
+
+    // Envoyer au script pour conversion PDF
+    const r = await apiGet({
+      action: 'pdf_mensuel',
+      salarie: sal,
+      html: encodeURIComponent(pdfHtml),
+    });
+
+    if (r && r.ok) {
+      const link = document.createElement('a');
+      link.href = 'data:application/pdf;base64,' + r.base64;
+      link.download = 'Mensuel_' + sal + '_' + moisNom.replace(/ /g,'_') + '.pdf';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast('✅ PDF téléchargé !', 2000);
+    } else {
+      showToast('❌ Erreur : ' + (r?.error || 'impossible'), 4000);
+    }
+  } catch(err) {
+    showToast('❌ ' + err.message, 4000);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📄 Télécharger le mois en PDF';
   }
 }
 
@@ -518,7 +878,7 @@ function renderCalCell(j, month) {
 }
 
 // ── CONFIG ────────────────────────────────────────────────────
-let API_URL = 'https://script.google.com/macros/s/AKfycbyuxep3TPF6lG1kr0I10yfjIX2GIYt9-DatY_X3fp0fNcLeiPLkITA6LSi8kgaoUHrALA/exec';
+let API_URL = 'https://script.google.com/macros/s/AKfycbz5RpfL8IK-4gRKEl7PeGWnW3nSKthtVK6aPYlvjnSRCf2opUxLdVXnNzbxmKPIBUV2GQ/exec';
 const CACHE = {};
 let currentSalarie = 'ANATOLE';
 let currentRecapSal = 'ANATOLE';
@@ -537,6 +897,7 @@ function goTab(name, btn) {
   btn.classList.add('active');
   if (name === 'solde')      loadSolde();
   if (name === 'semaine')    loadSemaine(currentSalarie);
+  if (name === 'mensuel')    loadMensuel();
   if (name === 'recap')      loadRecap(currentRecapSal);
   if (name === 'calendrier') loadCalendrier();
 }
