@@ -618,10 +618,18 @@ async function apiGet(params) {
   if (!API_URL) return null;
   const url = API_URL + '?' + new URLSearchParams(params);
   try {
-    const r = await fetch(url);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    const r = await fetch(url, { signal: controller.signal });
+    clearTimeout(timeout);
     return await r.json();
   } catch(e) {
-    return { error: e.message };
+    if (e.name === 'AbortError') {
+      showToast('❌ Délai dépassé — vérifiez la connexion', 4000);
+    } else {
+      showToast('❌ Erreur réseau : ' + e.message, 4000);
+    }
+    return null;
   }
 }
 
@@ -722,9 +730,13 @@ async function loadSemaine(sal) {
   el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Chargement semaine...</div></div>';
 
   updateWeekLabel();
-    const data = await apiGet({ action: 'semaine', salarie: sal, offset: currentWeekOffset });
-  if (!data || data.error) {
-    el.innerHTML = `<div class="alerte danger">❌ ${data?.error || 'Erreur'}</div>`;
+  const data = await apiGet({ action: 'semaine', salarie: sal, offset: currentWeekOffset });
+  if (!data) {
+    el.innerHTML = '<div class="empty">❌ Délai dépassé — vérifiez la connexion et réessayez</div>';
+    return;
+  }
+  if (data.error) {
+    el.innerHTML = `<div class="empty">❌ ${data.error}</div>`;
     return;
   }
 
@@ -734,10 +746,15 @@ async function loadSemaine(sal) {
   }
 
   CACHE['semaine_' + sal] = data;
-  renderSemaine(data.semaine);
+  try {
+    renderSemaine(data.semaine, sal);
+  } catch(err) {
+    el.innerHTML = `<div class="empty">❌ Erreur affichage : ${err.message}</div>`;
+  }
 }
 
-function renderSemaine(jours) {
+function renderSemaine(jours, sal) {
+  sal = sal || currentSalarie;
   const el = document.getElementById('semaine-content');
 
   // Calculer totaux semaine depuis les valeurs affichées
@@ -760,7 +777,7 @@ function renderSemaine(jours) {
   let totalTravMin = 0;
   let totalEcartMin = 0;
   let totalMajMin = 0;
-  const BASE_SEMAINE = 35; // h
+  const BASE_SEMAINE = (sal === 'ANTONIO') ? 39 : 35; // h
   let joursComptes = 0;
 
   for (const j of jours) {
@@ -1181,21 +1198,3 @@ async function saveConfig() {
   if (r && r.ok) {
     showToast('✅ Connexion OK !');
     setStatus('Connecté');
-    loadSolde();
-  } else {
-    showToast('❌ Échec : vérifiez l\'URL et les droits de déploiement');
-  }
-}
-
-// ── REFRESH ───────────────────────────────────────────────────
-function refreshAll() {
-  const activePage = document.querySelector('.page.active').id;
-  if (activePage === 'page-solde')   loadSolde();
-  if (activePage === 'page-semaine') loadSemaine(currentSalarie);
-  if (activePage === 'page-recap')   loadRecap(currentRecapSal);
-  showToast('🔄 Actualisation...');
-}
-
-// ── UTILS ─────────────────────────────────────────────────────
-function setStatus(msg) {
-  document.getElementById('nav-status
