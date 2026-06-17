@@ -669,6 +669,15 @@ async function telechargerPdfMensuel() {
     let totalTravMin = 0, totalEcartMin = 0;
     let nbConge = 0, nbRtt = 0, nbAbs = 0;
 
+    function parseDisplayDuration(str) {
+      if (!str || str === '' || str === '0:00' || str === '0:00:00') return 0;
+      const neg = str.startsWith('-');
+      const clean = str.replace('-','');
+      const parts = clean.split(':');
+      const min = parseInt(parts[0]||0)*60 + parseInt(parts[1]||0);
+      return neg ? -min : min;
+    }
+
     let rows = '';
     for (const j of allJours) {
       const type = j.type || '';
