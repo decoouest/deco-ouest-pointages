@@ -452,6 +452,18 @@ async function telechargerPdfSalarie() {
 }
 
 // ── MENSUEL ────────────────────────────────────────────────────
+function traduireMois(nomAnglais) {
+  const trad = {
+    'January':'Janvier','February':'Février','March':'Mars','April':'Avril',
+    'May':'Mai','June':'Juin','July':'Juillet','August':'Août',
+    'September':'Septembre','October':'Octobre','November':'Novembre','December':'Décembre'
+  };
+  // Remplacer le nom du mois anglais par le français
+  for (const [en, fr] of Object.entries(trad)) {
+    if (nomAnglais.includes(en)) return nomAnglais.replace(en, fr);
+  }
+  return nomAnglais;
+}
 let currentMensSalarie = 'ANATOLE';
 let currentMensMonthOffset = 0;
 
@@ -492,7 +504,7 @@ async function loadMensuel() {
     return;
   }
 
-  const moisNom = data.nomMois || '';
+  const moisNom = traduireMois(data.nomMois || '');
   document.getElementById('mens-month-label').textContent =
     moisNom.charAt(0).toUpperCase() + moisNom.slice(1);
 
