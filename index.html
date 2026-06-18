@@ -168,11 +168,14 @@ td.pos { color: var(--green); font-weight: 600; }
 .mens-total-card .lbl { font-size: 10px; color: var(--text2); }
 
 /* CALENDRIER */
-.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr) auto; gap: 4px; }
-.cal-total-head { font-size: 10px; font-weight: 700; color: var(--blue); text-align: center; padding: 4px 2px; }
-.cal-total-cell { background: var(--blue-l); border-radius: 8px; min-height: 52px; padding: 4px 3px;
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-row-total { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.cal-row-cells { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; flex: 1; }
+.cal-total-head { font-size: 10px; font-weight: 700; color: var(--blue); text-align: center;
+                  padding: 4px 6px; background: var(--blue-l); border-radius: 8px; white-space: nowrap; }
+.cal-total-cell { background: var(--blue); border-radius: 8px; min-height: 52px; padding: 6px;
                   display: flex; flex-direction: column; align-items: center; justify-content: center;
-                  font-size: 11px; font-weight: 700; color: var(--blue); min-width: 38px; }
+                  font-size: 12px; font-weight: 700; color: white; min-width: 44px; width: 44px; }
 .cal-total-mois { background: var(--blue); color: white; border-radius: 10px; padding: 10px 16px;
                   text-align: center; margin-top: 8px; }
 .cal-total-mois .val { font-size: 20px; font-weight: 700; }
@@ -1024,10 +1027,14 @@ async function loadCalendrier() {
 
 function renderCalendrier(weeksData, month) {
   const joursLabels = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
-  let html = '<div class="card"><div class="cal-grid">';
-  // En-têtes + colonne Total
+  let html = '<div class="card">';
+  // En-têtes
+  html += '<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">';
+  html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;flex:1">';
   for (const j of joursLabels) html += `<div class="cal-head">${j}</div>`;
-  html += '<div class="cal-total-head">Total</div>';
+  html += '</div>';
+  html += '<div class="cal-total-head" style="min-width:44px;width:44px">Total</div>';
+  html += '</div>';
 
   // Calcul total mois
   let totalMoisMin = 0;
@@ -1042,8 +1049,10 @@ function renderCalendrier(weeksData, month) {
   }
 
   for (const week of weeksData) {
-    // Jours lun-ven
     let weekMin = 0;
+    html += '<div style="display:flex;gap:6px;align-items:stretch;margin-bottom:4px">';
+    html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;flex:1">';
+    // Jours lun-ven
     for (let i = 0; i < 5; i++) {
       html += renderCalCell(week.jours[i], month);
       if (week.jours[i]) {
@@ -1062,9 +1071,11 @@ function renderCalendrier(weeksData, month) {
         <div class="cal-daynum">${dt.getDate()}</div>
       </div>`;
     }
-    // Colonne total semaine
+    html += '</div>';
+    // Colonne total semaine SÉPARÉE
     totalMoisMin += weekMin;
     html += `<div class="cal-total-cell">${weekMin > 0 ? minToHhm(weekMin) : '—'}</div>`;
+    html += '</div>';
   }
 
   html += '</div>';
