@@ -168,6 +168,15 @@ td.pos { color: var(--green); font-weight: 600; }
 .mens-total-card .lbl { font-size: 10px; color: var(--text2); }
 
 /* CALENDRIER */
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr) auto; gap: 4px; }
+.cal-total-head { font-size: 10px; font-weight: 700; color: var(--blue); text-align: center; padding: 4px 2px; }
+.cal-total-cell { background: var(--blue-l); border-radius: 8px; min-height: 52px; padding: 4px 3px;
+                  display: flex; flex-direction: column; align-items: center; justify-content: center;
+                  font-size: 11px; font-weight: 700; color: var(--blue); min-width: 38px; }
+.cal-total-mois { background: var(--blue); color: white; border-radius: 10px; padding: 10px 16px;
+                  text-align: center; margin-top: 8px; }
+.cal-total-mois .val { font-size: 20px; font-weight: 700; }
+.cal-total-mois .lbl { font-size: 11px; opacity: .8; margin-bottom: 4px; }
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .cal-head { text-align: center; font-size: 10px; font-weight: 700; color: var(--text2);
             text-transform: uppercase; padding: 4px 0; }
@@ -487,6 +496,88 @@ window.addEventListener('DOMContentLoaded', () => {
 <div class="toast" id="toast"></div>
 
 <script>
+// ── PDF CALENDRIER ────────────────────────────────────────────
+async function telechargerPdfCalendrier() {
+  const btn = document.querySelector('#page-calendrier .btn-save');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = '⏳ Génération...';
+
+  try {
+    const now = new Date();
+    const target = new Date(now.getFullYear(), now.getMonth() + currentCalMonthOffset, 1);
+    const moisNom = target.toLocaleDateString('fr-FR', {month:'long', year:'numeric'});
+    const moisNomFr = moisNom.charAt(0).toUpperCase() + moisNom.slice(1);
+
+    // Récupérer le contenu HTML du calendrier actuel
+    const calContent = document.getElementById('calendrier-content').innerHTML;
+
+    const pdfHtml = `<html><head><meta charset="utf-8"><style>
+      body{font-family:Arial,sans-serif;font-size:11px;color:#263238;padding:16px}
+      h1{color:#1565C0;font-size:18px;margin-bottom:4px}
+      .sub{color:#607D8B;font-size:12px;margin-bottom:16px}
+      .card{background:white;border-radius:8px;padding:12px;margin-bottom:12px}
+      .cal-grid{display:grid;grid-template-columns:repeat(7,1fr) auto;gap:3px}
+      .cal-head{text-align:center;font-size:9px;font-weight:700;color:#607D8B;text-transform:uppercase;padding:3px 0}
+      .cal-total-head{font-size:9px;font-weight:700;color:#1565C0;text-align:center;padding:3px 0}
+      .cal-cell{border-radius:5px;min-height:40px;padding:3px;font-size:9px}
+      .cal-daynum{font-size:10px;font-weight:700}
+      .cal-extra{font-size:8px;font-weight:600}
+      .cal-cell.travaille{background:#E3F2FD}
+      .cal-cell.weekend{background:#ECEFF1;color:#90A4AE}
+      .cal-cell.conge{background:#E8F5E9}
+      .cal-cell.absent{background:#FFEBEE}
+      .cal-cell.rtt{background:#F3E5F5}
+      .cal-cell.ferie{background:#FFF9C4}
+      .cal-cell.out-month{opacity:.3}
+      .cal-total-cell{background:#E3F2FD;border-radius:5px;min-height:40px;
+                      display:flex;align-items:center;justify-content:center;
+                      font-size:10px;font-weight:700;color:#1565C0}
+      .cal-total-mois{background:#1565C0;color:white;border-radius:8px;padding:10px;text-align:center;margin-top:8px}
+      .cal-total-mois .val{font-size:18px;font-weight:700}
+      .cal-total-mois .lbl{font-size:10px;opacity:.8}
+    </style></head><body>
+    <h1>D ECO OUEST — ${currentCalSalarie} — ${moisNomFr}</h1>
+    <div class="sub">Généré le ${new Date().toLocaleDateString('fr-FR')}</div>
+    ${calContent}
+    </body></html>`;
+
+    const encoded = encodeURIComponent(pdfHtml);
+    const CHUNK = 800;
+    const total = Math.ceil(encoded.length / CHUNK);
+    let finalR = null;
+
+    for (let i = 0; i < total; i++) {
+      const chunk = encoded.substring(i * CHUNK, (i+1) * CHUNK);
+      btn.textContent = '⏳ ' + Math.round((i+1)/total*100) + '%...';
+      const r = await apiGet({
+        action: 'pdf_mensuel_chunk',
+        salarie: currentCalSalarie,
+        chunk: chunk,
+        idx: i,
+        total: total,
+      });
+      if (!r || !r.ok) { showToast('❌ Erreur PDF', 4000); break; }
+      if (i === total - 1) finalR = r;
+    }
+
+    if (finalR && finalR.base64) {
+      const link = document.createElement('a');
+      link.href = 'data:application/pdf;base64,' + finalR.base64;
+      link.download = 'Calendrier_' + currentCalSalarie + '_' + moisNomFr.replace(/ /g,'_') + '.pdf';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast('✅ PDF téléchargé !', 2000);
+    }
+  } catch(err) {
+    showToast('❌ ' + err.message, 4000);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📄 Télécharger en PDF';
+  }
+}
+
 // ── PDF INDIVIDUEL ────────────────────────────────────────────
 async function telechargerPdfSalarie() {
   const btn = document.getElementById('btn-pdf-salarie');
@@ -934,15 +1025,34 @@ async function loadCalendrier() {
 function renderCalendrier(weeksData, month) {
   const joursLabels = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
   let html = '<div class="card"><div class="cal-grid">';
+  // En-têtes + colonne Total
   for (const j of joursLabels) html += `<div class="cal-head">${j}</div>`;
+  html += '<div class="cal-total-head">Total</div>';
 
-  const pad = n => String(n).padStart(2,'0');
+  // Calcul total mois
+  let totalMoisMin = 0;
+
+  function hhmToMin(str) {
+    if (!str || str === '' || str === '0:00' || str === '0:00:00') return 0;
+    const p = str.replace('-','').split(':');
+    return parseInt(p[0]||0)*60 + parseInt(p[1]||0);
+  }
+  function minToHhm(min) {
+    return Math.floor(min/60) + ':' + (min%60).toString().padStart(2,'0');
+  }
 
   for (const week of weeksData) {
+    // Jours lun-ven
+    let weekMin = 0;
     for (let i = 0; i < 5; i++) {
       html += renderCalCell(week.jours[i], month);
+      if (week.jours[i]) {
+        const j = week.jours[i];
+        const inMonth = parseInt(j.date.split('/')[1])-1 === month;
+        if (inMonth && j.travaille) weekMin += hhmToMin(j.travaille);
+      }
     }
-    // Samedi / Dimanche (pas dans les données semaine)
+    // Sam/Dim
     for (let i = 5; i < 7; i++) {
       const dt = new Date(week.monday);
       dt.setDate(dt.getDate() + i);
@@ -952,8 +1062,25 @@ function renderCalendrier(weeksData, month) {
         <div class="cal-daynum">${dt.getDate()}</div>
       </div>`;
     }
+    // Colonne total semaine
+    totalMoisMin += weekMin;
+    html += `<div class="cal-total-cell">${weekMin > 0 ? minToHhm(weekMin) : '—'}</div>`;
   }
-  html += '</div></div>';
+
+  html += '</div>';
+
+  // Total mois
+  html += `<div class="cal-total-mois">
+    <div class="lbl">Total du mois</div>
+    <div class="val">${minToHhm(totalMoisMin)}</div>
+  </div>`;
+
+  // Bouton PDF
+  html += `<button class="btn-save" style="margin-top:10px" onclick="telechargerPdfCalendrier()">
+    📄 Télécharger en PDF
+  </button>`;
+
+  html += '</div>';
   document.getElementById('calendrier-content').innerHTML = html;
 }
 
