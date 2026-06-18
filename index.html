@@ -350,6 +350,16 @@ window.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
 
+      <!-- Remarque / Commentaire -->
+      <div style="margin-top:12px">
+        <label style="font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:6px">💬 Remarque / Commentaire</label>
+        <textarea id="f-remarque" rows="3" placeholder="Saisir une remarque..."
+          style="width:100%;padding:12px;border:2px solid #E0E0E0;border-radius:10px;
+                 font-size:14px;resize:vertical;font-family:inherit;outline:none;box-sizing:border-box;"
+          onfocus="this.style.borderColor='var(--blue)'"
+          onblur="this.style.borderColor='#E0E0E0'"></textarea>
+      </div>
+
       <!-- Photo Reolink col K -->
       <div id="photo-form" style="display:none;margin-top:4px">
         <label class="form-label">📷 Photo Reolink (colonne K)</label>
@@ -969,7 +979,7 @@ function renderCalCell(j, month) {
 }
 
 // ── CONFIG ────────────────────────────────────────────────────
-let API_URL = 'https://script.google.com/macros/s/AKfycbzm8J_49_H7LxXHMc4JnbDdxbb4Obju_4D8c6D7N1yTi2WKkc6dmPpnFtvzG15INV9snw/exec';
+let API_URL = 'https://script.google.com/macros/s/AKfycbwSfEN9YSjK8s5MSom9286W1fb9rylzF_nmTVylMbYnASEFtepxAZUxFlBBNiLuijwMZg/exec';
 const CACHE = {};
 let currentSalarie = 'ANATOLE';
 let currentRecapSal = 'ANATOLE';
@@ -1261,6 +1271,7 @@ function renderSemaine(jours) {
       <div class="jour-type">${typeLabel(type)}</div>
       ${isTravaille && j.travaille && j.travaille !== '0:00' ? `<div class="jour-heures">${cleanTime(j.travaille)}</div>` : ''}
       ${isTravaille && j.ecart && j.ecart !== '0:00' ? `<div class="jour-ecart ${j.ecart.startsWith('-') ? 'neg' : 'pos'}">${cleanTime(j.ecart)}</div>` : ''}
+      ${j.remarque ? `<div style="font-size:9px;color:var(--amber);margin-left:4px">💬</div>` : ''}
     </div>`;
   }
 
@@ -1431,6 +1442,15 @@ async function sauvegarder() {
   const btn = document.getElementById('btn-save');
   btn.disabled = true;
   btn.textContent = 'Enregistrement...';
+
+  // 0. Sauvegarder la remarque
+  const remarque = document.getElementById('f-remarque')?.value || '';
+  await apiGet({
+    action: 'saisir_remarque',
+    salarie: currentSalarie,
+    row: currentSaisieRow.row,
+    remarque: remarque,
+  });
 
   // 1. Sauvegarder le type
   const r1 = await apiGet({
