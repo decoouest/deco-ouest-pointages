@@ -594,13 +594,13 @@ async function telechargerPdfCalendrier() {
         }
         calHtml += `<td style="${cellS}background:${bg};opacity:${op}">${inner}</td>`;
       }
-      // Ajouter majoration 25% (sauf Antonio) — base 35h FIXE
+      // Total = 35h00 FIXE + Maj. 25% (sauf Antonio) — identique à l'onglet Semaine
       let weekTotalMin = weekMin;
       if (currentCalSalarie !== 'ANTONIO') {
         const baseMin = 35 * 60;
         const excessMin = weekMin - baseMin;
         const majMin = excessMin > 0 ? Math.round(excessMin * 1.25) : 0;
-        weekTotalMin = weekMin + majMin;
+        weekTotalMin = baseMin + majMin;
       }
       totalMoisMin += weekTotalMin;
       calHtml += `<td style="${totalS}">${weekTotalMin>0?minToHhm(weekTotalMin):'—'}</td></tr>`;
@@ -1144,13 +1144,13 @@ function renderCalendrier(weeksData, month) {
       </div>`;
     }
     html += '</div>';
-    // Ajouter majoration 25% (sauf Antonio) — base 35h FIXE (identique à l'onglet Semaine)
+    // Total = 35h00 FIXE + Maj. 25% (sauf Antonio) — identique à l'onglet Semaine
     let weekTotalMin = weekMin;
     if (currentCalSalarie !== 'ANTONIO') {
       const baseMin = 35 * 60;
       const excessMin = weekMin - baseMin;
       const majMin = excessMin > 0 ? Math.round(excessMin * 1.25) : 0;
-      weekTotalMin = weekMin + majMin;
+      weekTotalMin = baseMin + majMin;
     }
     // Colonne total semaine SÉPARÉE (H.trav + Maj.)
     totalMoisMin += weekTotalMin;
@@ -1514,7 +1514,7 @@ function renderSemaine(jours) {
         </div>
         <div style="text-align:center;background:var(--blue);border-radius:8px;padding:8px;grid-column:1/-1">
           <div style="font-size:10px;color:rgba(255,255,255,.8);margin-bottom:3px">Total (H. trav. + Maj.)</div>
-          <div style="font-size:20px;font-weight:700;color:white">${minsToStr(totalTravMin + totalMajMin)}</div>
+          <div style="font-size:20px;font-weight:700;color:white">${minsToStr(35*60 + totalMajMin)}</div>
         </div>` : `<div style="text-align:center;background:var(--blue);border-radius:8px;padding:8px;grid-column:1/-1">
           <div style="font-size:10px;color:rgba(255,255,255,.8);margin-bottom:3px">Total semaine</div>
           <div style="font-size:20px;font-weight:700;color:white">${minsToStr(totalTravMin)}</div>
