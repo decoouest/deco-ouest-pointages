@@ -586,13 +586,20 @@ async function telechargerPdfCalendrier() {
         const bg = inMonth && j ? typeColor(j.type) : '#F5F5F5';
         const op = inMonth ? '1' : '0.4';
         let inner = `<b style="font-size:12px">${dt.getDate()}</b>`;
-        const isTrav = j && (j.type === 'Jour Travaillé' || j.type === 'journee solidarité travaillé');
+        const isTrav = j && j.type === 'Jour Travaillé';
+        const isSolidarite = j && j.type === 'journee solidarité travaillé';
         const isAbsRttConge = j && (j.type === 'CONGE' || j.type === 'RTT' || j.type === 'ABSENT' || j.type === 'ARRET TRAVAIL MALADIE');
         if (inMonth && j && j.type === 'ARRET TRAVAIL MALADIE') aArretMaladie = true;
-        if (isTrav && j.travaille && j.travaille !== '0:00' && j.travaille !== '0:00:00') {
+        if ((isTrav || isSolidarite) && j.travaille && j.travaille !== '0:00' && j.travaille !== '0:00:00') {
           const t = j.travaille.replace(':00','');
           inner += `<br><span style="color:#1565C0;font-size:10px">${t}</span>`;
-          if (inMonth) { weekMin += hhmToMin(j.travaille); nbJoursTrav++; }
+          if (inMonth && isTrav) { weekMin += hhmToMin(j.travaille); nbJoursTrav++; }
+          if (inMonth && isSolidarite) {
+            const minSol = hhmToMin(j.travaille);
+            const dep = minSol - baseJourMin;
+            if (dep > 0) weekMin += dep;
+            nbJoursTrav++;
+          }
         } else if (j) {
           const lbl = typeLabel(j.type);
           if (lbl) inner += `<br><span style="color:#546E7A;font-size:9px">${lbl}</span>`;
@@ -1154,10 +1161,17 @@ function renderCalendrier(weeksData, month) {
       if (week.jours[i]) {
         const j = week.jours[i];
         const inMonth = parseInt(j.date.split('/')[1])-1 === month;
-        const isTrav = j.type === 'Jour Travaillé' || j.type === 'journee solidarité travaillé';
+        const isTrav = j.type === 'Jour Travaillé';
+        const isSolidarite = j.type === 'journee solidarité travaillé';
         const isAbsRttConge = j.type === 'CONGE' || j.type === 'RTT' || j.type === 'ABSENT' || j.type === 'ARRET TRAVAIL MALADIE';
         if (inMonth && j.type === 'ARRET TRAVAIL MALADIE') aArretMaladie = true;
         if (inMonth && isTrav && j.travaille) { weekMin += hhmToMin(j.travaille); nbJoursTrav++; }
+        if (inMonth && isSolidarite && j.travaille) {
+          const minSol = hhmToMin(j.travaille);
+          const dep = minSol - baseJourMin;
+          if (dep > 0) weekMin += dep;
+          nbJoursTrav++;
+        }
         if (inMonth && isAbsRttConge) { baseAjusteeMin -= baseJourMin; }
       }
     }
@@ -1506,11 +1520,19 @@ function renderSemaine(jours) {
 
   for (const j of jours) {
     const type = j.type || '';
-    const isTravaille = type === 'Jour Travaillé' || type === 'journee solidarité travaillé';
+    const isTravaille = type === 'Jour Travaillé';
+    const isSolidarite = type === 'journee solidarité travaillé';
     const isAbsRttConge = type === 'CONGE' || type === 'RTT' || type === 'ABSENT' || type === 'ARRET TRAVAIL MALADIE';
     if (type === 'ARRET TRAVAIL MALADIE') aArretMaladie = true;
     if (isTravaille && j.travaille) {
       totalTravMin += parseDisplayDuration(j.travaille);
+      joursComptes++;
+    }
+    if (isSolidarite && j.travaille) {
+      // Journée de solidarité : les 7 premières heures sont neutres (ni base ni heures sup)
+      const minSolidarite = parseDisplayDuration(j.travaille);
+      const depassement = minSolidarite - (BASE_JOUR * 60);
+      if (depassement > 0) totalTravMin += depassement;
       joursComptes++;
     }
     if (isTravaille && j.ecart) {
