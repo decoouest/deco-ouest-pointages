@@ -1252,7 +1252,7 @@ function renderCalCell(j, month) {
 }
 
 // ── CONFIG ────────────────────────────────────────────────────
-let API_URL = 'https://script.google.com/macros/s/AKfycbwSfEN9YSjK8s5MSom9286W1fb9rylzF_nmTVylMbYnASEFtepxAZUxFlBBNiLuijwMZg/exec';
+let API_URL = 'https://script.google.com/macros/s/AKfycbwLe7NqbKn1o2zOYeviVuKojFtBB0oLtJ4ShGz0G0W4zQ7lxGcCDvTaoLTQ_0Sjy0YV2Q/exec';
 const CACHE = {};
 let currentSalarie = 'ANATOLE';
 let currentRecapSal = 'ANATOLE';
@@ -1823,11 +1823,36 @@ async function loadRecap(sal) {
 
   const isAntonio = data.isAntonio || sal === 'ANTONIO';
 
+  // Récupérer la date de la journée de solidarité
+  const solData = await apiGet({ action: 'solidarite', salarie: sal });
+  let solHtml = '';
+  if (solData && solData.ok) {
+    if (solData.found) {
+      solHtml = `<div class="card" style="margin-bottom:10px;background:var(--blue-l)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:18px">🤝</span>
+          <div>
+            <div style="font-size:11px;color:var(--text2)">Journée de solidarité ${new Date().getFullYear()}</div>
+            <div style="font-size:14px;font-weight:700;color:var(--blue)">Effectuée le ${solData.date}</div>
+          </div>
+        </div>
+      </div>`;
+    } else {
+      solHtml = `<div class="card" style="margin-bottom:10px;background:var(--amber-l)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:18px">⚠️</span>
+          <div style="font-size:13px;font-weight:600;color:var(--amber)">Journée de solidarité non encore effectuée</div>
+        </div>
+      </div>`;
+    }
+  }
+
   let html = `<div class="card" style="margin-bottom:10px">
     <button class="btn-save" onclick="telechargerPdfSalarie()" id="btn-pdf-salarie">
       📄 Télécharger le rapport PDF — ${sal}
     </button>
   </div>`;
+  html += solHtml;
   html += '<div class="card" style="overflow-x:auto">';
   html += '<table class="recap-table"><thead><tr>';
 
