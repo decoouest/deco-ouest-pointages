@@ -360,6 +360,10 @@ window.addEventListener('DOMContentLoaded', () => {
           <label class="form-label">🕐 Heure de fin de journée</label>
           <input class="form-input" type="time" id="f-fin" value="16:00" style="font-size:22px;padding:14px;text-align:center;font-weight:700">
         </div>
+        <button type="button" onclick="definirModele()" id="btn-modele" style="width:100%;padding:10px;background:var(--blue-l);
+                color:var(--blue);border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-top:4px">
+          💾 Utiliser comme heure habituelle
+        </button>
       </div>
 
       <!-- Remarque / Commentaire -->
@@ -415,9 +419,12 @@ window.addEventListener('DOMContentLoaded', () => {
   </div>
 
   <!-- Bouton PDF -->
-  <div style="margin-top:10px">
-    <button class="btn-save" id="btn-pdf-mensuel" onclick="telechargerPdfMensuel()">
-      📄 Télécharger le mois en PDF
+  <div style="margin-top:10px;display:flex;gap:8px">
+    <button class="btn-save" id="btn-pdf-mensuel" onclick="telechargerPdfMensuel()" style="flex:1">
+      📄 PDF
+    </button>
+    <button class="btn-save" id="btn-csv-mensuel" onclick="telechargerCsvMensuel()" style="flex:1;background:var(--green)">
+      📊 CSV
     </button>
   </div>
 </div>
@@ -441,6 +448,10 @@ window.addEventListener('DOMContentLoaded', () => {
     <button class="sal-btn artiom"         onclick="setCalSal('ARTIOM',this)">Artiom</button>
     <button class="sal-btn antonio"        onclick="setCalSal('ANTONIO',this)">Antonio</button>
   </div>
+  <button onclick="toggleVueEquipe()" id="btn-vue-equipe" style="width:100%;padding:10px;background:var(--blue-l);
+          color:var(--blue);border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:10px">
+    👥 Voir les congés/RTT de toute l'équipe
+  </button>
   <div class="week-nav">
     <button class="week-nav-btn" onclick="changeCalMonth(-1)">‹</button>
     <div class="week-label">
@@ -891,6 +902,67 @@ function minsToStr2(mins) {
 }
 
 // ── PDF MENSUEL ────────────────────────────────────────────────
+// ── EXPORT CSV MENSUEL ───────────────────────────────────────
+async function telechargerCsvMensuel() {
+  const btn = document.getElementById('btn-csv-mensuel');
+  btn.disabled = true;
+  btn.textContent = '⏳...';
+
+  try {
+    const data = await apiGet({
+      action: 'mois',
+      salarie: currentMensSalarie,
+      offset: currentMensMonthOffset
+    });
+
+    if (!data || !data.ok) {
+      showToast('❌ Impossible de récupérer les données', 4000);
+      return;
+    }
+
+    const moisNom = traduireMois(data.nomMois || '');
+    const moisNomFr = moisNom.charAt(0).toUpperCase() + moisNom.slice(1);
+
+    // En-têtes CSV
+    const headers = ['Date', 'Jour', 'Type', 'Arrivée', 'Pause midi', 'Reprise', 'Fin', 'Travaillé', 'Écart', 'Remarque'];
+    const rows = [headers.join(';')];
+
+    for (const j of data.mois) {
+      const row = [
+        j.date,
+        j.jour || '',
+        typeLabel(j.type) || j.type || '',
+        j.arrivee ? j.arrivee.replace(':00','') : '',
+        j.pauseMidi ? j.pauseMidi.replace(':00','') : '',
+        j.reprise ? j.reprise.replace(':00','') : '',
+        j.fin ? j.fin.replace(':00','') : '',
+        j.travaille ? j.travaille.replace(':00','') : '',
+        j.ecart ? j.ecart.replace(':00','') : '',
+        (j.remarque || '').replace(/;/g, ',').replace(/\n/g, ' ')
+      ];
+      rows.push(row.join(';'));
+    }
+
+    // BOM UTF-8 pour Excel
+    const csvContent = '\uFEFF' + rows.join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'Export_' + currentMensSalarie + '_' + moisNomFr.replace(/ /g,'_') + '.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast('✅ CSV téléchargé !', 2000);
+  } catch(err) {
+    showToast('❌ ' + err.message, 4000);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📊 CSV';
+  }
+}
+
 async function telechargerPdfMensuel() {
   const btn = document.getElementById('btn-pdf-mensuel');
   btn.disabled = true;
@@ -1057,22 +1129,85 @@ async function telechargerPdfMensuel() {
 let currentCalSalarie = 'ANATOLE';
 let currentCalMonthOffset = 0;
 let calLoadToken = 0;
+let vueEquipeActive = false;
 
 function setCalSal(nom, btn) {
   currentCalSalarie = nom;
   document.querySelectorAll('#page-calendrier .sal-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  if (vueEquipeActive) { vueEquipeActive = false; document.getElementById('btn-vue-equipe').textContent = "👥 Voir les congés/RTT de toute l'équipe"; }
   loadCalendrier();
 }
 
 function changeCalMonth(delta) {
   currentCalMonthOffset += delta;
-  loadCalendrier();
+  if (vueEquipeActive) loadVueEquipe(); else loadCalendrier();
 }
 
 function goToCalToday() {
   currentCalMonthOffset = 0;
-  loadCalendrier();
+  if (vueEquipeActive) loadVueEquipe(); else loadCalendrier();
+}
+
+function toggleVueEquipe() {
+  vueEquipeActive = !vueEquipeActive;
+  document.getElementById('btn-vue-equipe').textContent = vueEquipeActive
+    ? '📅 Retour au calendrier individuel'
+    : "👥 Voir les congés/RTT de toute l'équipe";
+  document.querySelector('#page-calendrier .sal-picker').style.display = vueEquipeActive ? 'none' : 'flex';
+  if (vueEquipeActive) loadVueEquipe(); else loadCalendrier();
+}
+
+async function loadVueEquipe() {
+  const el = document.getElementById('calendrier-content');
+  el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Chargement de l\\'équipe...</div></div>';
+
+  const salaries = ['ANATOLE', 'ARTIOM', 'ANTONIO'];
+  const results = {};
+  for (const sal of salaries) {
+    const data = await apiGet({ action: 'mois', salarie: sal, offset: currentCalMonthOffset });
+    results[sal] = (data && data.ok) ? data.mois : [];
+  }
+
+  const now = new Date();
+  const target = new Date(now.getFullYear(), now.getMonth() + currentCalMonthOffset, 1);
+  const moisNom = traduireMois(target.toLocaleDateString('en-US', {month:'long', year:'numeric'}));
+  document.getElementById('cal-month-label').textContent = moisNom.charAt(0).toUpperCase() + moisNom.slice(1);
+
+  // Construire la liste des jours d'absence/RTT/congé pour chaque salarié
+  const typesInteressants = ['CONGE', 'RTT', 'ABSENT', 'ARRET TRAVAIL MALADIE'];
+  const typeIcon = { 'CONGE':'🏖️', 'RTT':'📋', 'ABSENT':'❌', 'ARRET TRAVAIL MALADIE':'🏥' };
+  const typeNom = { 'CONGE':'Congé', 'RTT':'RTT', 'ABSENT':'Absent', 'ARRET TRAVAIL MALADIE':'Arrêt maladie' };
+
+  let html = '';
+  let totalEvenements = 0;
+
+  for (const sal of salaries) {
+    const evenements = (results[sal] || []).filter(j => typesInteressants.includes(j.type));
+    if (evenements.length === 0) continue;
+    totalEvenements += evenements.length;
+
+    const couleur = sal === 'ANATOLE' ? '#1565C0' : sal === 'ARTIOM' ? '#283593' : '#2E7D32';
+    html += `<div class="card" style="margin-bottom:10px">
+      <div style="font-size:14px;font-weight:700;color:${couleur};margin-bottom:8px">${sal}</div>`;
+
+    for (const j of evenements) {
+      html += `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F0F0F0">
+        <span style="font-size:16px">${typeIcon[j.type] || '📅'}</span>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600">${j.date} <span style="color:var(--text2);font-weight:400">(${j.jour})</span></div>
+          <div style="font-size:11px;color:var(--text2)">${typeNom[j.type] || j.type}</div>
+        </div>
+      </div>`;
+    }
+    html += '</div>';
+  }
+
+  if (totalEvenements === 0) {
+    html = '<div class="empty">✅ Aucun congé, RTT ou absence ce mois-ci pour l\\'équipe</div>';
+  }
+
+  el.innerHTML = html;
 }
 
 async function loadCalendrier() {
@@ -1569,6 +1704,10 @@ function renderSemaine(jours) {
   const totalFinalMin = aArretMaladie ? (totalTravMin + totalMajMin) : (baseAjustee + totalMajMin);
 
   let html = '<div class="card"><div class="card-title">Cette semaine — cliquez pour saisir</div>';
+  html += `<button onclick="appliquerModeleSemaine()" style="width:100%;padding:10px;background:var(--green-l);
+           color:var(--green);border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:10px">
+    ⚡ Appliquer l'heure habituelle aux jours travaillés
+  </button>`;
   for (const j of jours) {
     const type = j.type || '';
     const typeClass = typeToClass(type);
@@ -1694,6 +1833,61 @@ function openSaisie(jour) {
 
   document.getElementById('semaine-content').style.display = 'none';
   document.getElementById('saisie-page').style.display = 'block';
+}
+
+// ── MODÈLE DE SEMAINE (heure habituelle par salarié) ────────────
+function definirModele() {
+  const fin = document.getElementById('f-fin').value;
+  if (!fin) return;
+  localStorage.setItem('modele_fin_' + currentSalarie, fin);
+  showToast('💾 Heure habituelle enregistrée : ' + fin, 2000);
+}
+
+function getModeleFin(sal) {
+  return localStorage.getItem('modele_fin_' + sal) || null;
+}
+
+async function appliquerModeleSemaine() {
+  const modeleFin = getModeleFin(currentSalarie);
+  if (!modeleFin) {
+    showToast('⚠️ Aucune heure habituelle définie pour ' + currentSalarie, 3000);
+    return;
+  }
+
+  const data = CACHE['semaine_' + currentSalarie];
+  if (!data || !data.semaine) {
+    showToast('❌ Données semaine non chargées', 3000);
+    return;
+  }
+
+  const joursTravailles = data.semaine.filter(j =>
+    (j.type === 'Jour Travaillé' || j.type === 'journee solidarité travaillé') &&
+    (!j.fin || j.fin === '00:00' || j.fin === '')
+  );
+
+  if (joursTravailles.length === 0) {
+    showToast('✅ Tous les jours travaillés ont déjà une heure de fin', 3000);
+    return;
+  }
+
+  if (!confirm(`Appliquer ${modeleFin} comme heure de fin pour ${joursTravailles.length} jour(s) travaillé(s) sans heure saisie ?`)) {
+    return;
+  }
+
+  showToast('⏳ Application en cours...', 2000);
+  let nbOk = 0;
+  for (const j of joursTravailles) {
+    const r = await apiGet({
+      action: 'saisir_fin',
+      salarie: currentSalarie,
+      row: j.row,
+      fin: modeleFin,
+    });
+    if (r && r.ok) nbOk++;
+  }
+
+  showToast(`✅ ${nbOk}/${joursTravailles.length} jour(s) mis à jour`, 3000);
+  loadSemaine(currentSalarie);
 }
 
 function hideSaisie() {
