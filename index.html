@@ -206,6 +206,7 @@ td.pos { color: var(--green); font-weight: 600; }
 .cal-dot.weekend   { background: var(--gray-l); border: 1px solid #90A4AE; }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 
@@ -305,7 +306,7 @@ window.addEventListener('DOMContentLoaded', () => {
 <div id="page-solde" class="page active">
   <div style="margin-bottom:10px">
     <button class="btn-save" onclick="telechargerPdfSolde()" id="btn-pdf-solde">
-      📄 Télécharger le rapport Solde en PDF
+      📸 Capturer Solde en image
     </button>
   </div>
   <div id="solde-content">
@@ -445,7 +446,7 @@ window.addEventListener('DOMContentLoaded', () => {
   <!-- Bouton PDF -->
   <div style="margin-top:10px">
     <button class="btn-save" id="btn-pdf-mensuel" onclick="telechargerPdfMensuel()">
-      📄 Télécharger le mois en PDF
+      📸 Capturer en image
     </button>
   </div>
 </div>
@@ -528,247 +529,6 @@ window.addEventListener('DOMContentLoaded', () => {
 
 <script>
 // ── PDF CALENDRIER ────────────────────────────────────────────
-async function telechargerPdfCalendrier() {
-  const btn = document.querySelector('#page-calendrier .btn-save');
-  if (!btn) return;
-  btn.disabled = true;
-  btn.textContent = '⏳ Génération...';
-
-  try {
-    const now = new Date();
-    const target = new Date(now.getFullYear(), now.getMonth() + currentCalMonthOffset, 1);
-    const moisNom = target.toLocaleDateString('fr-FR', {month:'long', year:'numeric'});
-    const moisNomFr = moisNom.charAt(0).toUpperCase() + moisNom.slice(1);
-
-    // Récupérer les données du mois depuis l'API
-    const data = await apiGet({action:'mois', salarie: currentCalSalarie, offset: currentCalMonthOffset});
-    if (!data || !data.ok) {
-      showToast('❌ Impossible de récupérer les données', 4000);
-      btn.disabled=false; btn.textContent='📄 Télécharger en PDF';
-      return;
-    }
-
-    const joursMap = {};
-    for (const j of data.mois) joursMap[j.date] = j;
-
-    function hhmToMin(str) {
-      if (!str||str===''||str==='0:00'||str==='0:00:00') return 0;
-      const p = str.replace('-','').split(':');
-      return parseInt(p[0]||0)*60+parseInt(p[1]||0);
-    }
-    function minToHhm(min) {
-      return Math.floor(min/60)+':'+(min%60).toString().padStart(2,'0');
-    }
-    function typeColor(type) {
-      if (!type||type==='Jour Travaillé'||type==='journee solidarité travaillé') return '#E3F2FD';
-      if (type==='CONGE') return '#E8F5E9';
-      if (type==='RTT') return '#F3E5F5';
-      if (type==='ABSENT'||type==='ARRET TRAVAIL MALADIE') return '#FFEBEE';
-      if (type==='JOUR FERIE non travaillé') return '#FFF9C4';
-      return '#ECEFF1';
-    }
-    function typeLabel(type) {
-      if (type==='CONGE') return 'Congé';
-      if (type==='RTT') return 'RTT';
-      if (type==='ABSENT') return 'Absent';
-      if (type==='JOUR FERIE non travaillé') return 'Férié';
-      if (type==='ARRET TRAVAIL MALADIE') return 'Maladie';
-      return '';
-    }
-
-    const month = target.getMonth();
-    const firstDay = new Date(target.getFullYear(), month, 1);
-    const lastDay  = new Date(target.getFullYear(), month+1, 0);
-    const firstMon = new Date(firstDay);
-    firstMon.setDate(firstDay.getDate()-((firstDay.getDay()+6)%7));
-
-    const weeks = [];
-    let cursor = new Date(firstMon);
-    while (cursor <= lastDay) { weeks.push(new Date(cursor)); cursor.setDate(cursor.getDate()+7); }
-
-    const pad = n => String(n).padStart(2,'0');
-    const joursLabels = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
-    const cellS = 'padding:5px;border-radius:4px;font-size:10px;vertical-align:top;width:12%;';
-    const totalS = 'padding:5px;border-radius:4px;font-size:11px;font-weight:700;color:white;background:#1565C0;text-align:center;vertical-align:middle;width:7%;';
-
-    let totalMoisMin = 0;
-    let calHtml = '<table style="width:100%;border-collapse:separate;border-spacing:3px"><tr>';
-
-    for (const j of joursLabels) {
-      calHtml += `<td style="text-align:center;font-size:9px;font-weight:700;color:#607D8B;padding:2px 0">${j}</td>`;
-    }
-    calHtml += '<td style="text-align:center;font-size:9px;font-weight:700;color:#1565C0;padding:2px 0">Total</td></tr>';
-
-    for (const mon of weeks) {
-      let weekMin = 0;
-      let nbJoursTrav = 0;
-      let baseAjusteeMin = (currentCalSalarie === 'ANTONIO' ? 39 : 35) * 60;
-      const baseJourMin = (currentCalSalarie === 'ANTONIO' ? 8 : 7) * 60;
-      let aArretMaladie = false;
-      calHtml += '<tr style="height:55px">';
-      for (let d = 0; d < 7; d++) {
-        const dt = new Date(mon); dt.setDate(mon.getDate()+d);
-        const inMonth = dt.getMonth()===month;
-        const key = pad(dt.getDate())+'/'+pad(dt.getMonth()+1)+'/'+dt.getFullYear();
-        const j = joursMap[key];
-        const bg = inMonth && j ? typeColor(j.type) : '#F5F5F5';
-        const op = inMonth ? '1' : '0.4';
-        let inner = `<b style="font-size:12px">${dt.getDate()}</b>`;
-        const isTrav = j && j.type === 'Jour Travaillé';
-        const isSolidarite = j && j.type === 'journee solidarité travaillé';
-        const isAbsRttConge = j && (j.type === 'CONGE' || j.type === 'RTT' || j.type === 'ABSENT' || j.type === 'ARRET TRAVAIL MALADIE');
-        if (inMonth && j && j.type === 'ARRET TRAVAIL MALADIE') aArretMaladie = true;
-        if ((isTrav || isSolidarite) && j.travaille && j.travaille !== '0:00' && j.travaille !== '0:00:00') {
-          const t = j.travaille.replace(':00','');
-          inner += `<br><span style="color:#1565C0;font-size:10px">${t}</span>`;
-          if (inMonth && isTrav) { weekMin += hhmToMin(j.travaille); nbJoursTrav++; }
-          if (inMonth && isSolidarite) {
-            const minSol = hhmToMin(j.travaille);
-            const dep = minSol - baseJourMin;
-            if (dep > 0) weekMin += dep;
-            nbJoursTrav++;
-          }
-        } else if (j) {
-          const lbl = typeLabel(j.type);
-          if (lbl) inner += `<br><span style="color:#546E7A;font-size:9px">${lbl}</span>`;
-        }
-        if (inMonth && isAbsRttConge) baseAjusteeMin -= baseJourMin;
-        calHtml += `<td style="${cellS}background:${bg};opacity:${op}">${inner}</td>`;
-      }
-      // Vérifier si la semaine a des données saisies
-      const today = new Date(); today.setHours(0,0,0,0);
-      const semaineEstFuture = mon > today;
-      let aDesDonnees = false;
-      for (let d = 0; d < 5; d++) {
-        const dt2 = new Date(mon); dt2.setDate(mon.getDate()+d);
-        const key2 = pad(dt2.getDate())+'/'+pad(dt2.getMonth()+1)+'/'+dt2.getFullYear();
-        const j2 = joursMap[key2];
-        if (j2 && j2.travaille && j2.travaille !== '' && j2.travaille !== '0:00' && j2.travaille !== '0:00:00') {
-          aDesDonnees = true; break;
-        }
-      }
-      // Total : si Arrêt Maladie → H.trav + Maj ; sinon → base ajustée + Maj
-      let weekTotalMin = weekMin;
-      if (currentCalSalarie !== 'ANTONIO') {
-        const excessMin = weekMin - baseAjusteeMin;
-        const majMin = excessMin > 0 ? Math.round(excessMin * 1.25) : 0;
-        weekTotalMin = aArretMaladie ? (weekMin + majMin) : (baseAjusteeMin + majMin);
-      }
-      if (semaineEstFuture && !aDesDonnees) {
-        calHtml += `<td style="${totalS}">—</td></tr>`;
-      } else {
-        totalMoisMin += weekTotalMin;
-        calHtml += `<td style="${totalS}">${weekTotalMin>0?minToHhm(weekTotalMin):'—'}</td></tr>`;
-      }
-    }
-    calHtml += '</table>';
-    calHtml += `<div style="background:#1565C0;color:white;border-radius:8px;padding:12px;text-align:center;margin-top:12px">
-      <div style="font-size:12px;opacity:.8">Total du mois</div>
-      <div style="font-size:24px;font-weight:700;margin-top:4px">${minToHhm(totalMoisMin)}</div>
-    </div>`;
-
-    const pdfHtml = `<html><head><meta charset="utf-8"><style>
-      body{font-family:Arial,sans-serif;color:#263238;padding:20px;margin:0}
-      h1{color:#1565C0;font-size:18px;margin-bottom:4px}
-      .sub{color:#607D8B;font-size:12px;margin-bottom:16px}
-    </style></head><body>
-    <h1>D ECO OUEST — ${currentCalSalarie} — ${moisNomFr}</h1>
-    <div class="sub">Généré le ${new Date().toLocaleDateString('fr-FR')}</div>
-    ${calHtml}
-    </body></html>`;
-
-    const encoded = encodeURIComponent(pdfHtml);
-    const CHUNK = 1200;
-    const total = Math.ceil(encoded.length / CHUNK);
-    let finalR = null;
-
-    for (let i = 0; i < total; i++) {
-      const chunk = encoded.substring(i * CHUNK, (i+1) * CHUNK);
-      btn.textContent = '⏳ ' + Math.round((i+1)/total*100) + '%...';
-      const r = await apiGet({action:'pdf_mensuel_chunk', salarie: currentCalSalarie, chunk, idx: i, total});
-      if (!r || !r.ok) { showToast('❌ Erreur PDF', 4000); break; }
-      if (i === total - 1) finalR = r;
-    }
-
-    if (finalR && finalR.base64) {
-      const link = document.createElement('a');
-      link.href = 'data:application/pdf;base64,' + finalR.base64;
-      link.download = 'Calendrier_' + currentCalSalarie + '_' + moisNomFr.replace(/ /g,'_') + '.pdf';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      showToast('✅ PDF téléchargé !', 2000);
-    }
-  } catch(err) {
-    showToast('❌ ' + err.message, 4000);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '📄 Télécharger en PDF';
-  }
-}
-
-// ── PDF INDIVIDUEL ────────────────────────────────────────────
-async function telechargerPdfSalarie() {
-  const btn = document.getElementById('btn-pdf-salarie');
-  const original = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = '⏳ Génération du PDF...';
-
-  try {
-    const r = await apiGet({ action: 'pdf_salarie', salarie: currentRecapSal });
-    if (!r || !r.ok) {
-      showToast('❌ Erreur : ' + (r?.error || 'impossible de générer le PDF'), 4000);
-      return;
-    }
-    // Créer un lien de téléchargement
-    const link = document.createElement('a');
-    link.href = 'data:application/pdf;base64,' + r.base64;
-    link.download = r.filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast('✅ PDF téléchargé !', 2000);
-  } catch(err) {
-    showToast('❌ ' + err.message, 4000);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = original;
-  }
-}
-
-// ── MENSUEL ────────────────────────────────────────────────────
-function traduireMois(nomAnglais) {
-  const trad = {
-    'January':'Janvier','February':'Février','March':'Mars','April':'Avril',
-    'May':'Mai','June':'Juin','July':'Juillet','August':'Août',
-    'September':'Septembre','October':'Octobre','November':'Novembre','December':'Décembre'
-  };
-  // Remplacer le nom du mois anglais par le français
-  for (const [en, fr] of Object.entries(trad)) {
-    if (nomAnglais.includes(en)) return nomAnglais.replace(en, fr);
-  }
-  return nomAnglais;
-}
-let currentMensSalarie = 'ANATOLE';
-let currentMensMonthOffset = 0;
-
-function setMensSal(nom, btn) {
-  currentMensSalarie = nom;
-  document.querySelectorAll('#page-mensuel .sal-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  loadMensuel();
-}
-
-function changeMensMonth(delta) {
-  currentMensMonthOffset += delta;
-  loadMensuel();
-}
-
-function goToMensToday() {
-  currentMensMonthOffset = 0;
-  loadMensuel();
-}
-
 async function loadMensuel() {
   const el = document.getElementById('mensuel-content');
   if (!API_URL) {
@@ -923,175 +683,6 @@ function minsToStr2(mins) {
 }
 
 // ── PDF MENSUEL ────────────────────────────────────────────────
-async function telechargerPdfMensuel() {
-  const btn = document.getElementById('btn-pdf-mensuel');
-  btn.disabled = true;
-  btn.textContent = '⏳ Génération...';
-
-  try {
-    const now = new Date();
-    const target = new Date(now.getFullYear(), now.getMonth() + currentMensMonthOffset, 1);
-    const moisNom = target.toLocaleDateString('fr-FR', {month:'long', year:'numeric'});
-    const moisIdx = target.getMonth();
-    const annee   = target.getFullYear();
-
-    // Récupérer toutes les semaines du mois
-    const today = new Date(); today.setHours(0,0,0,0);
-    const todayMonday = new Date(today);
-    todayMonday.setDate(today.getDate() - ((today.getDay()+6)%7));
-
-    // Utiliser le cache si disponible, sinon un seul appel mois
-    const cacheKey = 'mensuel_' + currentMensSalarie + '_' + currentMensMonthOffset;
-    let allJours = [];
-    if (CACHE[cacheKey]) {
-      allJours = CACHE[cacheKey].mois;
-    } else {
-      const data = await apiGet({ action: 'mois', salarie: currentMensSalarie, offset: currentMensMonthOffset });
-      if (data && data.ok) allJours = data.mois;
-    }
-
-    // Construire HTML pour le PDF
-    const sal = currentMensSalarie;
-    const BASE = sal === 'ANTONIO' ? 39 : 35;
-    let totalTravMin = 0, totalEcartMin = 0;
-    let nbConge = 0, nbRtt = 0, nbAbs = 0;
-
-    function parseDisplayDuration(str) {
-      if (!str || str === '' || str === '0:00' || str === '0:00:00') return 0;
-      const neg = str.startsWith('-');
-      const clean = str.replace('-','');
-      const parts = clean.split(':');
-      const min = parseInt(parts[0]||0)*60 + parseInt(parts[1]||0);
-      return neg ? -min : min;
-    }
-
-    let rows = '';
-    for (const j of allJours) {
-      const type = j.type || '';
-      const isTrav = type === 'Jour Travaillé' || type === 'journee solidarité travaillé';
-      const isConge = type === 'CONGE';
-      const isRtt = type === 'RTT';
-      const isAbsent = type === 'ABSENT' || type === 'ARRET TRAVAIL MALADIE';
-      const isWeekend = type === 'week end';
-
-      let bg = '';
-      if (isWeekend) bg = 'background:#F5F7FA;color:#90A4AE;';
-      else if (isConge) bg = 'background:#E8F5E9;';
-      else if (isRtt) bg = 'background:#F3E5F5;';
-      else if (isAbsent) bg = 'background:#FFEBEE;';
-      else if (type === 'JOUR FERIE non travaillé') bg = 'background:#FFF9C4;';
-
-      if (isTrav) {
-        if (j.travaille) totalTravMin += parseDisplayDuration(j.travaille);
-        if (j.ecart) totalEcartMin += parseDisplayDuration(j.ecart);
-      }
-      if (isConge) nbConge++;
-      if (isRtt) nbRtt++;
-      if (isAbsent) nbAbs++;
-
-      const [dd, mm] = j.date.split('/');
-      rows += `<tr style="${bg}">
-        <td>${dd}/${mm}</td>
-        <td>${j.jour||''}</td>
-        <td>${typeLabel(type)}</td>
-        <td>${isTrav && j.travaille ? cleanTime(j.travaille) : '—'}</td>
-        <td style="color:${isTrav && j.ecart && j.ecart.startsWith('-')?'#C62828':'#2E7D32'}">${isTrav && j.ecart ? cleanTime(j.ecart) : '—'}</td>
-      </tr>`;
-    }
-
-    const pdfHtml = `<html><head><meta charset="utf-8"><style>
-      body{font-family:Arial,sans-serif;font-size:11px;color:#263238}
-      h1{color:#1565C0;font-size:18px;margin-bottom:4px}
-      .sub{color:#607D8B;font-size:12px;margin-bottom:16px}
-      table{width:100%;border-collapse:collapse}
-      th{background:#1565C0;color:white;padding:6px 8px;font-size:10px;text-align:center}
-      td{padding:5px 8px;border-bottom:1px solid #E0E0E0;text-align:center;font-size:10px}
-      .totaux{margin-top:12px;display:flex;gap:16px}
-      .tot{flex:1;background:#F5F7FA;padding:8px;border-radius:6px;text-align:center}
-      .tot .v{font-size:15px;font-weight:700;color:#1565C0}
-      .tot .l{font-size:9px;color:#607D8B}
-    </style></head><body>
-    <h1>D ECO OUEST — ${sal} — ${moisNom.charAt(0).toUpperCase()+moisNom.slice(1)}</h1>
-    <div class="sub">Rapport mensuel généré le ${new Date().toLocaleDateString('fr-FR')}</div>
-    <table>
-      <tr><th>Date</th><th>Jour</th><th>Type</th><th>Travaillé</th><th>Écart</th></tr>
-      ${rows}
-    </table>
-    <div class="totaux">
-      <div class="tot"><div class="v">${minsToStr2(totalTravMin)}</div><div class="l">H. travaillées</div></div>
-      <div class="tot"><div class="v" style="color:${totalEcartMin>=0?'#2E7D32':'#C62828'}">${minsToStr2(totalEcartMin)}</div><div class="l">Écart / base</div></div>
-      <div class="tot"><div class="v">${nbConge}</div><div class="l">J. Congés</div></div>
-      <div class="tot"><div class="v">${nbRtt}</div><div class="l">J. RTT</div></div>
-      <div class="tot"><div class="v">${nbAbs}</div><div class="l">J. Absence</div></div>
-    </div>
-    </body></html>`;
-
-    // Envoyer le HTML en chunks via GET (même méthode que les photos)
-    const encoded = encodeURIComponent(pdfHtml);
-    const CHUNK = 1200;
-    const total = Math.ceil(encoded.length / CHUNK);
-    let ok = true;
-    let finalR = null;
-
-    for (let i = 0; i < total; i++) {
-      const chunk = encoded.substring(i * CHUNK, (i+1) * CHUNK);
-      btn.textContent = '⏳ ' + Math.round((i+1)/total*100) + '%...';
-      const r = await apiGet({
-        action: 'pdf_mensuel_chunk',
-        salarie: sal,
-        chunk: chunk,
-        idx: i,
-        total: total,
-      });
-      if (!r || !r.ok) {
-        showToast('❌ Erreur chunk ' + i + ' : ' + (r?.error || ''), 4000);
-        ok = false;
-        break;
-      }
-      if (i === total - 1) finalR = r;
-    }
-
-    if (ok && finalR && finalR.base64) {
-      const link = document.createElement('a');
-      link.href = 'data:application/pdf;base64,' + finalR.base64;
-      link.download = 'Mensuel_' + sal + '_' + moisNom.replace(/ /g,'_') + '.pdf';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      showToast('✅ PDF téléchargé !', 2000);
-    } else if (ok) {
-      showToast('❌ PDF non généré', 4000);
-    }
-  } catch(err) {
-    showToast('❌ ' + err.message, 4000);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '📄 Télécharger le mois en PDF';
-  }
-}
-
-// ── CALENDRIER ─────────────────────────────────────────────────
-let currentCalSalarie = 'ANATOLE';
-let currentCalMonthOffset = 0;
-let calLoadToken = 0;
-
-function setCalSal(nom, btn) {
-  currentCalSalarie = nom;
-  document.querySelectorAll('#page-calendrier .sal-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  loadCalendrier();
-}
-
-function changeCalMonth(delta) {
-  currentCalMonthOffset += delta;
-  loadCalendrier();
-}
-
-function goToCalToday() {
-  currentCalMonthOffset = 0;
-  loadCalendrier();
-}
-
 async function loadCalendrier() {
   const myToken = ++calLoadToken;
   const el = document.getElementById('calendrier-content');
@@ -1241,7 +832,7 @@ function renderCalendrier(weeksData, month) {
 
   // Bouton PDF
   html += `<button class="btn-save" style="margin-top:10px" onclick="telechargerPdfCalendrier()">
-    📄 Télécharger en PDF
+    📸 Capturer en image
   </button>`;
 
   html += '</div>';
@@ -1407,102 +998,64 @@ async function apiPost(body) {
 }
 
 // ── SOLDE GLOBAL ──────────────────────────────────────────────
-// ── PDF SOLDE GLOBAL ───────────────────────────────────────────
-async function telechargerPdfSolde() {
-  const btn = document.getElementById('btn-pdf-solde');
-  btn.disabled = true;
-  btn.textContent = '⏳ Génération...';
 
+// ── CAPTURE D'ÉCRAN (html2canvas) ──────────────────────────────
+async function captureElement(elementId, filename) {
+  const el = document.getElementById(elementId);
+  if (!el) { showToast('❌ Élément introuvable', 3000); return; }
+  
+  showToast('⏳ Capture en cours...', 2000);
+  
   try {
-    const data = CACHE.solde || await apiGet({ action: 'solde' });
-    if (!data || !data.ok) {
-      showToast('❌ Impossible de récupérer les données', 4000);
-      return;
-    }
-
-    const date = new Date().toLocaleDateString('fr-FR');
-    let salRows = '';
-
-    for (const s of data.salaries) {
-      const couleur = s.positif ? '#2E7D32' : '#C62828';
-      const solData = s.solidarite || { found: false };
-      const solLine = solData.found
-        ? `<tr><td colspan="2" style="font-size:10px;color:#1565C0">🤝 Journée de solidarité effectuée le ${solData.date}</td></tr>`
-        : `<tr><td colspan="2" style="font-size:10px;color:#E65100">⚠️ Journée de solidarité non effectuée</td></tr>`;
-
-      salRows += `
-        <div style="background:${s.positif?'#E8F5E9':'#FFEBEE'};border-left:4px solid ${couleur};
-                    border-radius:8px;padding:14px;margin-bottom:12px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <span style="font-size:16px;font-weight:700;color:#263238">${s.nom}</span>
-            <span style="background:${couleur};color:white;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600">${s.statut}</span>
-          </div>
-          <table style="width:100%;border-collapse:collapse;font-size:11px">
-            <tr>
-              <td style="padding:4px 0;color:#607D8B">Net 2026</td>
-              <td style="text-align:right;font-weight:600">${s.net2026}</td>
-              <td style="padding:4px 8px;color:#607D8B">Report 2025</td>
-              <td style="text-align:right;font-weight:600">${s.report}</td>
-            </tr>
-            <tr>
-              <td style="padding:4px 0;color:#607D8B">Solde final</td>
-              <td style="text-align:right;font-weight:700;color:${couleur};font-size:14px">${s.solde}</td>
-              <td style="padding:4px 8px;color:#607D8B">Mois en cours</td>
-              <td style="text-align:right;font-weight:600">${s.mois}</td>
-            </tr>
-            ${solLine}
-          </table>
-        </div>`;
-    }
-
-    const pdfHtml = `<html><head><meta charset="utf-8"><style>
-      body{font-family:Arial,sans-serif;color:#263238;padding:20px;margin:0}
-      h1{color:#1565C0;font-size:20px;margin-bottom:4px}
-      .sub{color:#607D8B;font-size:12px;margin-bottom:20px}
-    </style></head><body>
-      <h1>🏗️ D ECO OUEST — Solde Global</h1>
-      <div class="sub">Généré le ${date}</div>
-      ${salRows}
-    </body></html>`;
-
-    const encoded = encodeURIComponent(pdfHtml);
-    const CHUNK = 1200;
-    const total = Math.ceil(encoded.length / CHUNK);
-    let finalR = null;
-
-    for (let i = 0; i < total; i++) {
-      const chunk = encoded.substring(i * CHUNK, (i+1) * CHUNK);
-      btn.textContent = '⏳ ' + Math.round((i+1)/total*100) + '%...';
-      const r = await apiGet({ action: 'pdf_mensuel_chunk', salarie: 'ANATOLE', chunk, idx: i, total });
-      if (!r || !r.ok) { showToast('❌ Erreur PDF', 4000); return; }
-      if (i === total - 1) finalR = r;
-    }
-
-    if (finalR && finalR.base64) {
-      const link = document.createElement('a');
-      link.href = 'data:application/pdf;base64,' + finalR.base64;
-      link.download = 'Solde_Global_' + date.replace(/\//g,'-') + '.pdf';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      showToast('✅ PDF téléchargé !', 2000);
-    }
+    const canvas = await html2canvas(el, {
+      scale: 2,           // Haute résolution
+      useCORS: true,
+      backgroundColor: '#F5F7FA',
+      logging: false,
+    });
+    
+    const link = document.createElement('a');
+    link.href = canvas.toDataURL('image/jpeg', 0.92);
+    link.download = filename + '_' + new Date().toLocaleDateString('fr-FR').replace(/\//g,'-') + '.jpg';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('✅ Image téléchargée !', 2000);
   } catch(err) {
     showToast('❌ ' + err.message, 4000);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '📄 Télécharger le rapport Solde en PDF';
   }
 }
 
-function renderSoldeFromCache() {
-  if (!CACHE.solde) return;
-  // Réafficher depuis le cache sans appel réseau
-  const el = document.getElementById('solde-content');
-  if (el && el.innerHTML && !el.innerHTML.includes('spinner')) return; // déjà affiché
-  loadSolde(); // fallback si contenu vide
+async function telechargerPdfMensuel() {
+  const btn = document.getElementById('btn-pdf-mensuel');
+  btn.disabled = true; btn.textContent = '⏳ Capture...';
+  await captureElement('mensuel-content', 'Mensuel_' + currentMensSalarie + '_' + (document.getElementById('mens-month-label').textContent || ''));
+  btn.disabled = false; btn.textContent = '📸 Capturer en image';
 }
 
+async function telechargerPdfSolde() {
+  const btn = document.getElementById('btn-pdf-solde');
+  btn.disabled = true; btn.textContent = '⏳ Capture...';
+  await captureElement('solde-content', 'Solde_Global');
+  btn.disabled = false; btn.textContent = '📸 Capturer Solde en image';
+}
+
+async function telechargerPdfCalendrier() {
+  const btn = document.querySelector('#page-calendrier .btn-save');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Capture...'; }
+  await captureElement('calendrier-content', 'Calendrier_' + currentCalSalarie + '_' + (document.getElementById('cal-month-label').textContent || ''));
+  if (btn) { btn.disabled = false; btn.textContent = '📸 Capturer en image'; }
+}
+
+async function telechargerPdfSalarie() {
+  const btn = document.getElementById('btn-pdf-salarie');
+  btn.disabled = true; btn.textContent = '⏳ Capture...';
+  await captureElement('recap-content', 'Recap_' + currentRecapSal);
+  btn.disabled = false; btn.textContent = '📸 Capturer en image';
+}
+
+
+// ── PDF SOLDE GLOBAL ───────────────────────────────────────────
 async function loadSolde() {
   const el = document.getElementById('solde-content');
   if (!API_URL) {
@@ -2026,7 +1579,7 @@ async function loadRecap(sal) {
 
   let html = `<div class="card" style="margin-bottom:10px">
     <button class="btn-save" onclick="telechargerPdfSalarie()" id="btn-pdf-salarie">
-      📄 Télécharger le rapport PDF — ${sal}
+      📸 Capturer en image — ${sal}
     </button>
   </div>`;
   html += solHtml;
