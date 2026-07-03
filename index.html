@@ -1912,36 +1912,7 @@ async function sauvegarder() {
     }
   }
 
-  // 3. Envoyer la photo en chunks via GET (PropertiesService = cache persistant)
-  if (selectedPhoto) {
-    btn.textContent = 'Envoi photo...';
-    try {
-      const CHUNK = 1500; // 1500 chars par chunk = URL ~1800 chars
-      const total = Math.ceil(selectedPhoto.length / CHUNK);
-      let photoOk = true;
-
-      for (let i = 0; i < total; i++) {
-        const chunk = selectedPhoto.substring(i * CHUNK, (i+1) * CHUNK);
-        if (total > 1) btn.textContent = '📤 Envoi ' + Math.round((i+1)/total*100) + '%';
-        const r3 = await apiGet({
-          action: 'saisir_photo_chunk',
-          salarie: currentSalarie,
-          row: currentSaisieRow.row,
-          chunk: encodeURIComponent(chunk),
-          idx: i,
-          total: total,
-        });
-        if (!r3 || (!r3.ok && i === total-1)) {
-          showToast('⚠️ Photo chunk erreur: ' + (r3?.error||''), 5000);
-          photoOk = false;
-          break;
-        }
-      }
-      if (photoOk) showToast('📷 Photo enregistrée !', 2000);
-    } catch(err) {
-      showToast('❌ Photo : ' + err.message, 5000);
-    }
-  }
+  // 3. Photo non envoyée vers Sheets (affichage local uniquement)
 
   if (r1 && r1.ok) {
     showToast('✅ Enregistré dans Google Sheets !');
