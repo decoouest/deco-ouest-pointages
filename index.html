@@ -678,7 +678,7 @@ async function telechargerPdfCalendrier() {
     </body></html>`;
 
     const encoded = encodeURIComponent(pdfHtml);
-    const CHUNK = 800;
+    const CHUNK = 2000;
     const total = Math.ceil(encoded.length / CHUNK);
     let finalR = null;
 
@@ -1028,7 +1028,7 @@ async function telechargerPdfMensuel() {
 
     // Envoyer le HTML en chunks via GET (même méthode que les photos)
     const encoded = encodeURIComponent(pdfHtml);
-    const CHUNK = 800;
+    const CHUNK = 2000;
     const total = Math.ceil(encoded.length / CHUNK);
     let ok = true;
     let finalR = null;
@@ -1270,7 +1270,7 @@ function renderCalCell(j, month) {
 }
 
 // ── CONFIG ────────────────────────────────────────────────────
-let API_URL = 'https://script.google.com/macros/s/AKfycbyODAsrYPG8qN2OyCl6wGjVbmqVXH5htnp5pzNyo0peqATp3BsKBTtQ4mVPGrL4CfQtMg/exec';
+let API_URL = 'https://script.google.com/macros/s/AKfycbyWtrNGxTOP5fT7nv4DvLecflOCbfHBb3Df4PkUmyptRnpKlICBxaJS9AAQfTO8fXIEdg/exec';
 const CACHE = {};
 let currentSalarie = 'ANATOLE';
 let currentRecapSal = 'ANATOLE';
@@ -1466,7 +1466,7 @@ async function telechargerPdfSolde() {
     </body></html>`;
 
     const encoded = encodeURIComponent(pdfHtml);
-    const CHUNK = 800;
+    const CHUNK = 2000;
     const total = Math.ceil(encoded.length / CHUNK);
     let finalR = null;
 
