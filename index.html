@@ -1287,7 +1287,13 @@ function goTab(name, btn) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
   btn.classList.add('active');
-  if (name === 'solde')      loadSolde();
+  activePage = 'page-' + name;
+
+  // Lazy loading avec cache — ne recharge que si nécessaire
+  if (name === 'solde') {
+    if (!CACHE.solde) loadSolde();
+    else renderSoldeFromCache();
+  }
   if (name === 'semaine')    loadSemaine(currentSalarie);
   if (name === 'mensuel')    loadMensuel();
   if (name === 'recap')      loadRecap(currentRecapSal);
@@ -1489,6 +1495,14 @@ async function telechargerPdfSolde() {
   }
 }
 
+function renderSoldeFromCache() {
+  if (!CACHE.solde) return;
+  // Réafficher depuis le cache sans appel réseau
+  const el = document.getElementById('solde-content');
+  if (el && el.innerHTML && !el.innerHTML.includes('spinner')) return; // déjà affiché
+  loadSolde(); // fallback si contenu vide
+}
+
 async function loadSolde() {
   const el = document.getElementById('solde-content');
   if (!API_URL) {
@@ -1579,31 +1593,44 @@ function buildAlertes(salaries) {
 }
 
 // ── SEMAINE ───────────────────────────────────────────────────
-async function loadSemaine(sal) {
+async function loadSemaine(sal, silent = false) {
   const el = document.getElementById('semaine-content');
-  hideSaisie();
+  if (!silent) hideSaisie();
   if (!API_URL) {
-    el.innerHTML = '<div class="empty">⚙️ Configurez l\'URL Apps Script</div>';
+    if (!silent) el.innerHTML = '<div class="empty">⚙️ Configurez l\'URL Apps Script</div>';
     return;
   }
-  el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Chargement semaine...</div></div>';
+
+  // Cache : ne recharge pas si même salarié et même semaine
+  const cacheKey = 'semaine_' + sal + '_' + currentWeekOffset;
+  if (CACHE[cacheKey] && !silent) {
+    updateWeekLabel();
+    renderSemaine(CACHE[cacheKey].semaine, sal);
+    return;
+  }
+
+  if (!silent) {
+    el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Chargement semaine...</div></div>';
+  }
 
   updateWeekLabel();
   const data = await apiGet({ action: 'semaine', salarie: sal, offset: currentWeekOffset });
   if (!data) {
-    el.innerHTML = '<div class="empty">❌ Délai dépassé — vérifiez la connexion et réessayez</div>';
+    if (!silent) el.innerHTML = '<div class="empty">❌ Délai dépassé — vérifiez la connexion et réessayez</div>';
     return;
   }
   if (data.error) {
-    el.innerHTML = `<div class="empty">❌ ${data.error}</div>`;
+    if (!silent) el.innerHTML = `<div class="empty">❌ ${data.error}</div>`;
     return;
   }
 
   if (!data.semaine || data.semaine.length === 0) {
-    el.innerHTML = '<div class="empty">📅 Aucune donnée pour cette semaine</div>';
+    if (!silent) el.innerHTML = '<div class="empty">📅 Aucune donnée pour cette semaine</div>';
     return;
   }
 
+  // Mettre en cache
+  CACHE[cacheKey] = data;
   CACHE['semaine_' + sal] = data;
   try {
     renderSemaine(data.semaine);
@@ -2172,7 +2199,6 @@ function showToast(msg, duration=3000) {
 // ── INIT ──────────────────────────────────────────────────────
 window.onload = async () => {
   setStatus('Connexion...');
-  // Test rapide de connexion avant de charger
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
@@ -2181,7 +2207,12 @@ window.onload = async () => {
     const data = await r.json();
     if (data && data.ok) {
       setStatus('Connecté');
+      // Charger l'onglet actif (Solde) immédiatement
       loadSolde();
+      // Pré-charger la semaine en arrière-plan après 1s
+      setTimeout(() => {
+        loadSemaine(currentSalarie, true); // true = silencieux
+      }, 1000);
     } else {
       setStatus('Erreur script');
       document.getElementById('solde-content').innerHTML =
