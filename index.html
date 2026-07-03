@@ -678,7 +678,7 @@ async function telechargerPdfCalendrier() {
     </body></html>`;
 
     const encoded = encodeURIComponent(pdfHtml);
-    const CHUNK = 2000;
+    const CHUNK = 1200;
     const total = Math.ceil(encoded.length / CHUNK);
     let finalR = null;
 
@@ -1028,7 +1028,7 @@ async function telechargerPdfMensuel() {
 
     // Envoyer le HTML en chunks via GET (même méthode que les photos)
     const encoded = encodeURIComponent(pdfHtml);
-    const CHUNK = 2000;
+    const CHUNK = 1200;
     const total = Math.ceil(encoded.length / CHUNK);
     let ok = true;
     let finalR = null;
@@ -1466,7 +1466,7 @@ async function telechargerPdfSolde() {
     </body></html>`;
 
     const encoded = encodeURIComponent(pdfHtml);
-    const CHUNK = 2000;
+    const CHUNK = 1200;
     const total = Math.ceil(encoded.length / CHUNK);
     let finalR = null;
 
