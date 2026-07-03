@@ -308,6 +308,10 @@ window.addEventListener('DOMContentLoaded', () => {
     <button class="btn-save" onclick="telechargerPdfSolde()" id="btn-pdf-solde">
       📄 Télécharger le rapport Solde en PDF
     </button>
+    <button class="btn-save" onclick="captureSolde()" id="btn-capture-solde"
+            style="margin-top:8px;background:#2E7D32">
+      📸 Capturer Solde en image
+    </button>
   </div>
   <div id="solde-content">
     <div class="loader"><div class="spinner"></div><div class="loader-text">Chargement...</div></div>
@@ -453,6 +457,10 @@ window.addEventListener('DOMContentLoaded', () => {
   <div style="margin-top:10px">
     <button class="btn-save" id="btn-pdf-mensuel" onclick="telechargerPdfMensuel()">
       📄 Télécharger le mois en PDF
+    </button>
+    <button class="btn-save" id="btn-capture-mensuel" onclick="captureMensuel()"
+            style="margin-top:8px;background:#2E7D32">
+      📸 Capturer le mois en image
     </button>
   </div>
 </div>
@@ -1754,6 +1762,40 @@ function afficherRemarque(date, texte) {
     </div>
   `;
   modal.style.display = 'flex';
+}
+
+// ── CAPTURE SOLDE & MENSUEL ──────────────────────────────────────
+async function captureSolde() {
+  const btn = document.getElementById('btn-capture-solde');
+  btn.disabled = true; btn.textContent = '⏳ Capture...';
+  try {
+    const canvas = await html2canvas(document.getElementById('solde-content'), {
+      scale: 2, useCORS: true, backgroundColor: '#F5F7FA', logging: false,
+    });
+    const link = document.createElement('a');
+    link.href = canvas.toDataURL('image/jpeg', 0.92);
+    link.download = 'Solde_' + new Date().toLocaleDateString('fr-FR').replace(/\//g,'-') + '.jpg';
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    showToast('✅ Image téléchargée !', 2000);
+  } catch(err) { showToast('❌ ' + err.message, 4000); }
+  finally { btn.disabled = false; btn.textContent = '📸 Capturer Solde en image'; }
+}
+
+async function captureMensuel() {
+  const btn = document.getElementById('btn-capture-mensuel');
+  btn.disabled = true; btn.textContent = '⏳ Capture...';
+  try {
+    const moisNom = document.getElementById('mens-month-label')?.textContent || 'Mois';
+    const canvas = await html2canvas(document.getElementById('mensuel-content'), {
+      scale: 2, useCORS: true, backgroundColor: '#F5F7FA', logging: false,
+    });
+    const link = document.createElement('a');
+    link.href = canvas.toDataURL('image/jpeg', 0.92);
+    link.download = 'Mensuel_' + currentMensSalarie + '_' + moisNom.replace(/\s/g,'_') + '.jpg';
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    showToast('✅ Image téléchargée !', 2000);
+  } catch(err) { showToast('❌ ' + err.message, 4000); }
+  finally { btn.disabled = false; btn.textContent = '📸 Capturer le mois en image'; }
 }
 
 // ── CAPTURE SEMAINE ─────────────────────────────────────────────
