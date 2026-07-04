@@ -2047,24 +2047,48 @@ async function sauvegarder() {
 }
 
 // ── RECAP ─────────────────────────────────────────────────────
-async function loadRecap(sal) {
+async function loadRecap(sal, forceRefresh) {
   const el = document.getElementById('recap-content');
   if (!API_URL) {
     el.innerHTML = '<div class="empty">⚙️ Configurez l\'URL Apps Script</div>';
     return;
   }
+
+  const cacheKey = 'recap_' + sal;
+  if (!forceRefresh && CACHE[cacheKey]) {
+    try { renderRecap(sal, CACHE[cacheKey].data, CACHE[cacheKey].solData); } catch(err) {}
+    Promise.all([
+      apiGet({ action: 'recap', salarie: sal }),
+      apiGet({ action: 'solidarite', salarie: sal })
+    ]).then(([data, solData]) => {
+      if (data && !data.error) {
+        CACHE[cacheKey] = { data, solData };
+        try { renderRecap(sal, data, solData); } catch(err) {}
+      }
+    });
+    return;
+  }
+
   el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Chargement...</div></div>';
 
-  const data = await apiGet({ action: 'recap', salarie: sal });
+  // Les deux requêtes en parallèle plutôt que l'une après l'autre
+  const [data, solData] = await Promise.all([
+    apiGet({ action: 'recap', salarie: sal }),
+    apiGet({ action: 'solidarite', salarie: sal })
+  ]);
   if (!data || data.error) {
     el.innerHTML = `<div class="alerte danger">❌ ${data?.error || 'Erreur'}</div>`;
     return;
   }
 
+  CACHE[cacheKey] = { data, solData };
+  renderRecap(sal, data, solData);
+}
+
+function renderRecap(sal, data, solData) {
+  const el = document.getElementById('recap-content');
   const isAntonio = data.isAntonio || sal === 'ANTONIO';
 
-  // Récupérer la date de la journée de solidarité
-  const solData = await apiGet({ action: 'solidarite', salarie: sal });
   let solHtml = '';
   if (solData && solData.ok) {
     if (solData.found) {
