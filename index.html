@@ -1140,7 +1140,13 @@ async function loadCalendrier() {
   document.getElementById('cal-month-label').textContent =
     traduireMois(target.toLocaleDateString('en-US', {month:'long', year:'numeric'}));
 
-  el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Chargement du calendrier...</div></div>';
+  const cacheKey = 'cal_' + currentCalSalarie + '_' + currentCalMonthOffset;
+  if (CACHE[cacheKey]) {
+    const weeksDataCache = CACHE[cacheKey].map(s => ({ monday: new Date(s.monday + 'T00:00:00'), jours: s.jours }));
+    if (myToken === calLoadToken) renderCalendrier(weeksDataCache, month);
+  } else {
+    el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Chargement du calendrier...</div></div>';
+  }
 
   const firstDay = new Date(year, month, 1);
   const lastDay  = new Date(year, month + 1, 0);
@@ -1162,17 +1168,17 @@ async function loadCalendrier() {
     cursor.setDate(cursor.getDate()+7);
   }
 
-  // Récupérer chaque semaine (en parallèle, pas en série, pour aller plus vite)
-  const promesses = mondays.map(m => {
-    const diffDays = Math.round((m - todayMonday) / (1000*60*60*24));
-    const offset = Math.round(diffDays/7);
-    return apiGet({action:'semaine', salarie: currentCalSalarie, offset: offset})
-      .then(data => ({ monday: m, jours: (data && data.semaine) ? data.semaine : [] }));
-  });
-  const weeksData = await Promise.all(promesses);
-
+  // Un seul appel groupé pour tout le mois (au lieu d'un appel par semaine)
+  const calData = await apiGet({ action: 'moisCalendrier', salarie: currentCalSalarie, offset: currentCalMonthOffset });
   if (myToken !== calLoadToken) return; // une navigation plus récente a eu lieu
-  renderCalendrier(weeksData, month);
+
+  if (calData && calData.ok && calData.semaines) {
+    CACHE[cacheKey] = calData.semaines;
+    const weeksData = calData.semaines.map(s => ({ monday: new Date(s.monday + 'T00:00:00'), jours: s.jours }));
+    renderCalendrier(weeksData, month);
+  } else if (!CACHE[cacheKey]) {
+    el.innerHTML = '<div class="empty">❌ Impossible de charger le calendrier</div>';
+  }
 }
 
 function renderCalendrier(weeksData, month) {
