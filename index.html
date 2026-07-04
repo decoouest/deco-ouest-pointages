@@ -784,10 +784,27 @@ function goToMensToday() {
   loadMensuel();
 }
 
-async function loadMensuel() {
+async function loadMensuel(forceRefresh) {
   const el = document.getElementById('mensuel-content');
   if (!API_URL) {
     el.innerHTML = '<div class="empty">⚙️ Configurez l\'URL Apps Script</div>';
+    return;
+  }
+
+  const cacheKey = 'mensuel_' + currentMensSalarie + '_' + currentMensMonthOffset;
+  if (!forceRefresh && CACHE[cacheKey]) {
+    const cached = CACHE[cacheKey];
+    const moisNomCache = traduireMois(cached.nomMois || '');
+    document.getElementById('mens-month-label').textContent =
+      moisNomCache.charAt(0).toUpperCase() + moisNomCache.slice(1);
+    try { renderMensuel(cached.mois, currentMensSalarie, moisNomCache); } catch(err) {}
+    apiGet({ action: 'mois', salarie: currentMensSalarie, offset: currentMensMonthOffset }).then(data => {
+      if (data && data.ok && data.mois) {
+        CACHE[cacheKey] = data;
+        const moisNom2 = traduireMois(data.nomMois || '');
+        try { renderMensuel(data.mois, currentMensSalarie, moisNom2); } catch(err) {}
+      }
+    });
     return;
   }
 
@@ -814,6 +831,7 @@ async function loadMensuel() {
     return;
   }
 
+  CACHE[cacheKey] = data;
   try {
     renderMensuel(data.mois, currentMensSalarie, moisNom);
   } catch(err) {
@@ -1144,14 +1162,14 @@ async function loadCalendrier() {
     cursor.setDate(cursor.getDate()+7);
   }
 
-  // Récupérer chaque semaine
-  const weeksData = [];
-  for (const m of mondays) {
+  // Récupérer chaque semaine (en parallèle, pas en série, pour aller plus vite)
+  const promesses = mondays.map(m => {
     const diffDays = Math.round((m - todayMonday) / (1000*60*60*24));
     const offset = Math.round(diffDays/7);
-    const data = await apiGet({action:'semaine', salarie: currentCalSalarie, offset: offset});
-    weeksData.push({ monday: m, jours: (data && data.semaine) ? data.semaine : [] });
-  }
+    return apiGet({action:'semaine', salarie: currentCalSalarie, offset: offset})
+      .then(data => ({ monday: m, jours: (data && data.semaine) ? data.semaine : [] }));
+  });
+  const weeksData = await Promise.all(promesses);
 
   if (myToken !== calLoadToken) return; // une navigation plus récente a eu lieu
   renderCalendrier(weeksData, month);
@@ -1504,10 +1522,17 @@ async function telechargerPdfSolde() {
   }
 }
 
-async function loadSolde() {
+async function loadSolde(forceRefresh) {
   const el = document.getElementById('solde-content');
   if (!API_URL) {
     el.innerHTML = '<div class="card"><div class="empty">⚙️ Configurez d\'abord l\'URL Apps Script dans l\'onglet Config</div></div>';
+    return;
+  }
+  if (!forceRefresh && CACHE.solde) {
+    renderSolde(CACHE.solde);
+    apiGet({ action: 'solde' }).then(data => {
+      if (data && !data.error) { CACHE.solde = data; renderSolde(data); }
+    });
     return;
   }
   el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Lecture du Sheets...</div></div>';
@@ -1516,7 +1541,12 @@ async function loadSolde() {
     el.innerHTML = `<div class="alerte danger">❌ Erreur : ${data?.error || 'Impossible de contacter Sheets'}</div>`;
     return;
   }
+  CACHE.solde = data;
+  renderSolde(data);
+}
 
+function renderSolde(data) {
+  const el = document.getElementById('solde-content');
   const alertes = buildAlertes(data.salaries);
   let html = '';
 
@@ -1577,7 +1607,6 @@ async function loadSolde() {
 
   el.innerHTML = html;
   setStatus('Connecté · ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}));
-  CACHE.solde = data;
 }
 
 function buildAlertes(salaries) {
@@ -1594,16 +1623,28 @@ function buildAlertes(salaries) {
 }
 
 // ── SEMAINE ───────────────────────────────────────────────────
-async function loadSemaine(sal) {
+async function loadSemaine(sal, forceRefresh) {
   const el = document.getElementById('semaine-content');
   hideSaisie();
   if (!API_URL) {
     el.innerHTML = '<div class="empty">⚙️ Configurez l\'URL Apps Script</div>';
     return;
   }
-  el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Chargement semaine...</div></div>';
-
   updateWeekLabel();
+
+  const cacheKey = 'semaine_' + sal + '_' + currentWeekOffset;
+  if (!forceRefresh && CACHE[cacheKey]) {
+    try { renderSemaine(CACHE[cacheKey].semaine); } catch(err) {}
+    apiGet({ action: 'semaine', salarie: sal, offset: currentWeekOffset }).then(data => {
+      if (data && !data.error && data.semaine) {
+        CACHE[cacheKey] = data;
+        try { renderSemaine(data.semaine); } catch(err) {}
+      }
+    });
+    return;
+  }
+
+  el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Chargement semaine...</div></div>';
   const data = await apiGet({ action: 'semaine', salarie: sal, offset: currentWeekOffset });
   if (!data) {
     el.innerHTML = '<div class="empty">❌ Délai dépassé — vérifiez la connexion et réessayez</div>';
@@ -1619,7 +1660,7 @@ async function loadSemaine(sal) {
     return;
   }
 
-  CACHE['semaine_' + sal] = data;
+  CACHE[cacheKey] = data;
   try {
     renderSemaine(data.semaine);
   } catch(err) {
@@ -1997,7 +2038,7 @@ async function sauvegarder() {
   if (r1 && r1.ok) {
     showToast('✅ Enregistré dans Google Sheets !');
     hideSaisie();
-    loadSemaine(currentSalarie);
+    loadSemaine(currentSalarie, true);
   } else {
     showToast('❌ Erreur : ' + (r1?.error || 'Échec'));
     btn.disabled = false;
