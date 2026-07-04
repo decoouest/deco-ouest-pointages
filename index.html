@@ -472,6 +472,12 @@ window.addEventListener('DOMContentLoaded', () => {
     <button class="sal-btn artiom"         onclick="setRecapSal('ARTIOM',this)">Artiom</button>
     <button class="sal-btn antonio"        onclick="setRecapSal('ANTONIO',this)">Antonio</button>
   </div>
+  <div style="margin-bottom:8px">
+    <button class="btn-save" onclick="captureRecap()" id="btn-capture-recap"
+            style="background:#2E7D32">
+      📸 Capturer le récap en image
+    </button>
+  </div>
   <div id="recap-content">
     <div class="loader"><div class="spinner"></div><div class="loader-text">Chargement...</div></div>
   </div>
@@ -491,6 +497,12 @@ window.addEventListener('DOMContentLoaded', () => {
     </div>
     <button class="week-nav-btn today-btn" onclick="goToCalToday()">Auj.</button>
     <button class="week-nav-btn" onclick="changeCalMonth(1)">›</button>
+  </div>
+  <div style="margin-bottom:8px">
+    <button class="btn-save" onclick="captureCalendrier()" id="btn-capture-calendrier"
+            style="background:#2E7D32">
+      📸 Capturer le calendrier en image
+    </button>
   </div>
   <div id="calendrier-content">
     <div class="loader"><div class="spinner"></div><div class="loader-text">Chargement du calendrier...</div></div>
@@ -1873,6 +1885,41 @@ async function captureSemaine() {
     btn.disabled = false;
     btn.textContent = '📸 Capturer la semaine en image';
   }
+}
+
+// ── CAPTURE RÉCAP ────────────────────────────────────────────────
+async function captureRecap() {
+  const btn = document.getElementById('btn-capture-recap');
+  btn.disabled = true; btn.textContent = '⏳ Capture...';
+  try {
+    const canvas = await html2canvas(document.getElementById('recap-content'), {
+      scale: 2, useCORS: true, backgroundColor: '#F5F7FA', logging: false,
+    });
+    const link = document.createElement('a');
+    link.href = canvas.toDataURL('image/jpeg', 0.92);
+    link.download = 'Recap_' + currentRecapSal + '_' + new Date().toLocaleDateString('fr-FR').replace(/\//g,'-') + '.jpg';
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    showToast('✅ Image téléchargée !', 2000);
+  } catch(err) { showToast('❌ ' + err.message, 4000); }
+  finally { btn.disabled = false; btn.textContent = '📸 Capturer le récap en image'; }
+}
+
+// ── CAPTURE CALENDRIER ───────────────────────────────────────────
+async function captureCalendrier() {
+  const btn = document.getElementById('btn-capture-calendrier');
+  btn.disabled = true; btn.textContent = '⏳ Capture...';
+  try {
+    const moisNom = document.getElementById('cal-month-label')?.textContent || 'Mois';
+    const canvas = await html2canvas(document.getElementById('calendrier-content'), {
+      scale: 2, useCORS: true, backgroundColor: '#F5F7FA', logging: false,
+    });
+    const link = document.createElement('a');
+    link.href = canvas.toDataURL('image/jpeg', 0.92);
+    link.download = 'Calendrier_' + currentCalSalarie + '_' + moisNom.replace(/\s/g,'_') + '.jpg';
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    showToast('✅ Image téléchargée !', 2000);
+  } catch(err) { showToast('❌ ' + err.message, 4000); }
+  finally { btn.disabled = false; btn.textContent = '📸 Capturer le calendrier en image'; }
 }
 
 function cleanTime(str) {
