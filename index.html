@@ -70,7 +70,7 @@ main { padding: 16px; max-width: 600px; margin: 0 auto; }
 .jour-row.ferie     { background: #FFF9C4; }
 .jour-row.today     { border: 2px solid var(--blue); box-shadow: 0 0 0 3px rgba(21,101,192,.15); }
 .jour-date { width: 42px; font-size: 12px; font-weight: 600; color: var(--text2); }
-.jour-nom  { width: 36px; font-size: 12px; color: var(--text2); }
+.jour-nom-complet { width: 72px; font-size: 13px; font-weight: 700; color: var(--text); }
 .jour-type { flex: 1; font-size: 13px; font-weight: 500; }
 .jour-heures { font-size: 13px; font-weight: 700; color: var(--blue); }
 .jour-ecart  { font-size: 11px; margin-left: 8px; font-weight: 600; }
@@ -1314,10 +1314,17 @@ function renderCalCell(j, month) {
   else if (j.type === 'ARRET TRAVAIL MALADIE') extra = 'Maladie';
 
   const isToday = j.isToday ? 'today' : '';
-  return `<div class="cal-cell ${typeClass} ${inMonth?'':'out-month'} ${isToday}">
+  const jourSafe = JSON.stringify(j).replace(/"/g, '&quot;');
+  return `<div class="cal-cell ${typeClass} ${inMonth?'':'out-month'} ${isToday}" onclick="openSaisieDepuisCalendrier(${jourSafe})">
     <div class="cal-daynum">${dd}</div>
     <div class="cal-extra">${extra}</div>
   </div>`;
+}
+
+// Ouvre le formulaire de saisie (avec capture photo) depuis un jour du calendrier
+function openSaisieDepuisCalendrier(jour) {
+  currentSalarie = currentCalSalarie; // aligne le contexte salarié sur celui du calendrier
+  openSaisie(jour);
 }
 
 // ── CONFIG ────────────────────────────────────────────────────
@@ -1754,8 +1761,8 @@ function renderSemaine(jours) {
     html += `
     <div class="jour-row ${typeClass} ${j.isToday ? 'today' : ''}" onclick="openSaisie(${JSON.stringify(j).replace(/\"/g,'&quot;')})">
       ${j.isToday ? '<span class="today-badge">AUJOURD\'HUI</span>' : ''}
+      <div class="jour-nom-complet">${nomJourFR(j.date)}</div>
       <div class="jour-date">${j.date}</div>
-      <div class="jour-nom">${j.jour}</div>
       <div class="jour-type">${typeLabel(type)}</div>
       ${isTravaille && j.travaille && j.travaille !== '0:00' ? `<div class="jour-heures">${cleanTime(j.travaille)}</div>` : ''}
       ${isTravaille && j.ecart && j.ecart !== '0:00' ? `<div class="jour-ecart ${j.ecart.startsWith('-') ? 'neg' : 'pos'}">${cleanTime(j.ecart)}</div>` : ''}
@@ -1922,6 +1929,14 @@ async function captureCalendrier() {
   finally { btn.disabled = false; btn.textContent = '📸 Capturer le calendrier en image'; }
 }
 
+// Renvoie le nom complet du jour de la semaine (Lundi, Mardi...) à partir d'une date dd/mm/yyyy
+function nomJourFR(dateStr) {
+  const noms = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+  const [dd, mm, yyyy] = dateStr.split('/').map(Number);
+  const d = new Date(yyyy, mm - 1, dd);
+  return noms[d.getDay()];
+}
+
 function cleanTime(str) {
   if (!str) return str;
   // Supprimer les secondes si présentes (ex: "8:00:00" → "8:00")
@@ -1991,7 +2006,7 @@ function openSaisie(jour) {
 
   const isTrav = jour.type === 'Jour Travaillé' || jour.type === 'journee solidarité travaillé';
   document.getElementById('heures-form').style.display = isTrav ? 'block' : 'none';
-  document.getElementById('photo-form').style.display = isTrav ? 'block' : 'none';
+  document.getElementById('photo-form').style.display = 'none'; // fonctionnalité en stand-by
   document.getElementById('btn-save').disabled = !selectedType;
 
   document.getElementById('semaine-content').style.display = 'none';
@@ -2045,7 +2060,7 @@ function selectType(type) {
   event.target.classList.add('selected');
   const isTrav = type === 'Jour Travaillé' || type === 'journee solidarité travaillé';
   document.getElementById('heures-form').style.display = isTrav ? 'block' : 'none';
-  document.getElementById('photo-form').style.display = isTrav ? 'block' : 'none';
+  document.getElementById('photo-form').style.display = 'none'; // fonctionnalité en stand-by
   document.getElementById('btn-save').disabled = false;
 }
 
@@ -2086,12 +2101,51 @@ async function sauvegarder() {
     }
   }
 
-  // 3. Photo non envoyée vers Sheets (affichage local uniquement)
+  // 3. Photo : fonctionnalité mise en stand-by (non envoyée pour le moment)
+  // Pour la réactiver, redécommenter le bloc ci-dessous.
+  /*
+  if (selectedPhoto) {
+    const CHUNK = 3000;
+    const total = Math.ceil(selectedPhoto.length / CHUNK);
+    for (let i = 0; i < total; i++) {
+      const chunk = encodeURIComponent(selectedPhoto.substring(i * CHUNK, (i+1) * CHUNK));
+      btn.textContent = '⏳ Photo ' + Math.round((i+1)/total*100) + '%...';
+      const rPhoto = await apiGet({
+        action: 'saisir_photo_chunk',
+        salarie: currentSalarie,
+        row: currentSaisieRow.row,
+        chunk: chunk,
+        idx: i,
+        total: total,
+      });
+      if (!rPhoto || rPhoto.error) {
+        showToast('⚠️ Enregistré, mais échec envoi photo : ' + (rPhoto?.error || 'inconnu'), 4000);
+        break;
+      }
+    }
+  }
+  */
 
   if (r1 && r1.ok) {
     showToast('✅ Enregistré dans Google Sheets !');
     hideSaisie();
-    loadSemaine(currentSalarie, true);
+
+    // Invalide le cache Semaine de la semaine concernée (au cas où on y retourne ensuite)
+    const [dd, mm, yyyy] = currentSaisieRow.date.split('/').map(Number);
+    const jourDate = new Date(yyyy, mm - 1, dd); jourDate.setHours(0,0,0,0);
+    const monday = new Date(jourDate); monday.setDate(jourDate.getDate() - ((jourDate.getDay()+6)%7));
+    const today = new Date(); today.setHours(0,0,0,0);
+    const todayMonday = new Date(today); todayMonday.setDate(today.getDate() - ((today.getDay()+6)%7));
+    const weekOffset = Math.round((monday - todayMonday) / (1000*60*60*24*7));
+    delete CACHE['semaine_' + currentSalarie + '_' + weekOffset];
+
+    const activePage = document.querySelector('.page.active')?.id;
+    if (activePage === 'page-calendrier') {
+      delete CACHE['cal_' + currentCalSalarie + '_' + currentCalMonthOffset];
+      loadCalendrier();
+    } else {
+      loadSemaine(currentSalarie, true);
+    }
   } else {
     showToast('❌ Erreur : ' + (r1?.error || 'Échec'));
     btn.disabled = false;
