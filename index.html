@@ -2140,26 +2140,15 @@ async function sauvegarder() {
     }
   }
 
-  // 3. Envoyer la photo (découpée en morceaux, comme pour le PDF)
+  // 3. Photo : téléchargée localement (pas d'envoi vers Sheets/Drive, archivage manuel par l'utilisateur)
   if (selectedPhoto) {
-    const CHUNK = 3000;
-    const total = Math.ceil(selectedPhoto.length / CHUNK);
-    for (let i = 0; i < total; i++) {
-      const chunk = encodeURIComponent(selectedPhoto.substring(i * CHUNK, (i+1) * CHUNK));
-      btn.textContent = '⏳ Photo ' + Math.round((i+1)/total*100) + '%...';
-      const rPhoto = await apiGet({
-        action: 'saisir_photo_chunk',
-        salarie: currentSalarie,
-        row: currentSaisieRow.row,
-        chunk: chunk,
-        idx: i,
-        total: total,
-      });
-      if (!rPhoto || rPhoto.error) {
-        showToast('⚠️ Enregistré, mais échec envoi photo : ' + (rPhoto?.error || 'inconnu'), 4000);
-        break;
-      }
-    }
+    const dateFichier = (currentSaisieRow.date || '').replace(/\//g, '-');
+    const link = document.createElement('a');
+    link.href = selectedPhoto;
+    link.download = 'Photo_' + currentSalarie + '_' + dateFichier + '.jpg';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
   if (r1 && r1.ok) {
