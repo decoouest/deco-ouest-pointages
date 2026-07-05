@@ -418,6 +418,7 @@ window.addEventListener('DOMContentLoaded', () => {
         <div id="photo-preview" style="display:none;margin-bottom:10px;text-align:center">
           <img id="photo-img" style="max-width:100%;border-radius:10px;max-height:180px;object-fit:cover">
           <div style="font-size:11px;color:var(--text2);margin-top:4px" id="photo-name"></div>
+          <a id="photo-link" href="#" target="_blank" style="display:none;font-size:12px;color:var(--blue);font-weight:600;margin-top:4px">⬇️ Voir / télécharger en pleine résolution</a>
         </div>
         <label style="display:flex;align-items:center;justify-content:center;gap:10px;background:var(--gray-l);border:2px dashed #B0BEC5;border-radius:10px;padding:16px;cursor:pointer;font-size:14px;color:var(--text2)">
           <span style="font-size:24px">📷</span>
@@ -2015,11 +2016,22 @@ function openSaisie(jour) {
     document.getElementById('f-fin').value = '16:00';
   }
 
-  // Réinitialiser photo
-  document.getElementById('photo-preview').style.display = 'none';
+  // Photo existante : afficher si présente, sinon réinitialiser
   document.getElementById('f-photo').value = '';
-  document.getElementById('photo-label').textContent = 'Prendre une photo ou choisir';
   selectedPhoto = null;
+  if (jour.photo && jour.photo.thumbUrl) {
+    document.getElementById('photo-img').src = jour.photo.thumbUrl;
+    document.getElementById('photo-preview').style.display = 'block';
+    document.getElementById('photo-name').textContent = 'Photo déjà enregistrée pour ce jour';
+    const lien = document.getElementById('photo-link');
+    lien.href = jour.photo.viewUrl;
+    lien.style.display = 'inline-block';
+    document.getElementById('photo-label').textContent = 'Remplacer la photo';
+  } else {
+    document.getElementById('photo-preview').style.display = 'none';
+    document.getElementById('photo-link').style.display = 'none';
+    document.getElementById('photo-label').textContent = 'Prendre une photo ou choisir';
+  }
 
   const isTrav = jour.type === 'Jour Travaillé' || jour.type === 'journee solidarité travaillé';
   document.getElementById('heures-form').style.display = isTrav ? 'block' : 'none';
@@ -2069,6 +2081,7 @@ function previewPhoto(input) {
       // Afficher aperçu (original pour la préview)
       document.getElementById('photo-img').src = e.target.result;
       document.getElementById('photo-preview').style.display = 'block';
+      document.getElementById('photo-link').style.display = 'none'; // nouvelle photo pas encore enregistrée
       document.getElementById('photo-label').textContent = '✅ Photo sélectionnée';
       selectedPhoto = compressed.split(',')[1];
       
