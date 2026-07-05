@@ -2016,13 +2016,23 @@ function openSaisie(jour) {
     document.getElementById('f-fin').value = '16:00';
   }
 
-  // Photo existante : afficher si présente, sinon réinitialiser
+  // Photo existante : priorité au stockage local (le plus fiable/rapide), sinon celle du Sheet
   document.getElementById('f-photo').value = '';
   selectedPhoto = null;
-  if (jour.photo && jour.photo.thumbUrl) {
+  let photoLocale = null;
+  try { photoLocale = localStorage.getItem('photo_' + currentSalarie + '_row' + jour.row); } catch(err) {}
+
+  if (photoLocale) {
+    document.getElementById('photo-img').src = photoLocale;
+    document.getElementById('photo-preview').style.display = 'block';
+    document.getElementById('photo-name').textContent = 'Photo enregistrée localement pour ce jour';
+    document.getElementById('photo-link').style.display = 'none';
+    document.getElementById('photo-label').textContent = 'Remplacer la photo';
+    // selectedPhoto reste null : on ne redéclenche le téléchargement/stockage que si une NOUVELLE photo est choisie
+  } else if (jour.photo && jour.photo.thumbUrl) {
     document.getElementById('photo-img').src = jour.photo.thumbUrl;
     document.getElementById('photo-preview').style.display = 'block';
-    document.getElementById('photo-name').textContent = 'Photo déjà enregistrée pour ce jour';
+    document.getElementById('photo-name').textContent = 'Photo déjà enregistrée pour ce jour (Sheets)';
     const lien = document.getElementById('photo-link');
     lien.href = jour.photo.viewUrl;
     lien.style.display = 'inline-block';
@@ -2140,8 +2150,14 @@ async function sauvegarder() {
     }
   }
 
-  // 3. Photo : téléchargée localement (pas d'envoi vers Sheets/Drive, archivage manuel par l'utilisateur)
+  // 3. Photo : conservée localement dans l'appli (visible en rouvrant ce jour) + téléchargée pour archivage manuel
   if (selectedPhoto) {
+    try {
+      localStorage.setItem('photo_' + currentSalarie + '_row' + currentSaisieRow.row, selectedPhoto);
+    } catch(err) {
+      showToast('⚠️ Photo non conservée localement (stockage plein) : ' + err.message, 4000);
+    }
+
     const dateFichier = (currentSaisieRow.date || '').replace(/\//g, '-');
     const link = document.createElement('a');
     link.href = selectedPhoto;
