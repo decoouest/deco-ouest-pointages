@@ -1322,8 +1322,20 @@ function renderCalCell(j, month) {
 }
 
 // Ouvre le formulaire de saisie (avec capture photo) depuis un jour du calendrier
+let saisieOrigine = 'semaine'; // mémorise d'où vient la saisie, pour savoir où revenir ensuite
+
 function openSaisieDepuisCalendrier(jour) {
   currentSalarie = currentCalSalarie; // aligne le contexte salarié sur celui du calendrier
+  saisieOrigine = 'calendrier';
+
+  // Le formulaire de saisie vit dans la page "Semaine" : il faut la rendre active
+  // pour qu'il soit réellement visible (sinon il reste caché derrière la page Calendrier)
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-semaine').classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  const btnSemaine = document.querySelector('.tab-btn[onclick*="\'semaine\'"]');
+  if (btnSemaine) btnSemaine.classList.add('active');
+
   openSaisie(jour);
 }
 
@@ -2019,6 +2031,15 @@ function hideSaisie() {
   currentSaisieRow = null;
   selectedType = null;
   selectedPhoto = null;
+
+  if (saisieOrigine === 'calendrier') {
+    saisieOrigine = 'semaine';
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-calendrier').classList.add('active');
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    const btnCal = document.querySelector('.tab-btn[onclick*="\'calendrier\'"]');
+    if (btnCal) btnCal.classList.add('active');
+  }
 }
 
 function previewPhoto(input) {
@@ -2127,17 +2148,21 @@ async function sauvegarder() {
   */
 
   if (r1 && r1.ok) {
+    // Capturer les infos AVANT hideSaisie() qui remet currentSaisieRow à null
+    const dateSaisie = currentSaisieRow.date;
+    const salarieSaisie = currentSalarie;
+
     showToast('✅ Enregistré dans Google Sheets !');
     hideSaisie();
 
     // Invalide le cache Semaine de la semaine concernée (au cas où on y retourne ensuite)
-    const [dd, mm, yyyy] = currentSaisieRow.date.split('/').map(Number);
+    const [dd, mm, yyyy] = dateSaisie.split('/').map(Number);
     const jourDate = new Date(yyyy, mm - 1, dd); jourDate.setHours(0,0,0,0);
     const monday = new Date(jourDate); monday.setDate(jourDate.getDate() - ((jourDate.getDay()+6)%7));
     const today = new Date(); today.setHours(0,0,0,0);
     const todayMonday = new Date(today); todayMonday.setDate(today.getDate() - ((today.getDay()+6)%7));
     const weekOffset = Math.round((monday - todayMonday) / (1000*60*60*24*7));
-    delete CACHE['semaine_' + currentSalarie + '_' + weekOffset];
+    delete CACHE['semaine_' + salarieSaisie + '_' + weekOffset];
 
     const activePage = document.querySelector('.page.active')?.id;
     if (activePage === 'page-calendrier') {
