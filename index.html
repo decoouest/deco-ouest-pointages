@@ -1801,6 +1801,30 @@ function afficherRemarque(date, texte) {
 }
 
 // ── CAPTURE RECAP ─────────────────────────────────────────────
+// ── FORMAT A4 POUR CAPTURES ─────────────────────────────────────
+// Recadre un canvas capturé dans une page A4 portrait (blanche), avec marges,
+// pour que l'image tienne entièrement sur une page à l'impression.
+function fitToA4(sourceCanvas, marginPx, orientation) {
+  marginPx = marginPx || 50;
+  const portrait = orientation !== 'landscape';
+  const A4_W = portrait ? 1240 : 1754;
+  const A4_H = portrait ? 1754 : 1240; // A4 ~150dpi
+  const out = document.createElement('canvas');
+  out.width = A4_W; out.height = A4_H;
+  const ctx = out.getContext('2d');
+  ctx.fillStyle = '#F5F7FA';
+  ctx.fillRect(0, 0, A4_W, A4_H);
+  const maxW = A4_W - marginPx * 2;
+  const maxH = A4_H - marginPx * 2;
+  const scale = Math.min(maxW / sourceCanvas.width, maxH / sourceCanvas.height);
+  const w = sourceCanvas.width * scale;
+  const h = sourceCanvas.height * scale;
+  const x = (A4_W - w) / 2;
+  const y = (A4_H - h) / 2;
+  ctx.drawImage(sourceCanvas, 0, 0, sourceCanvas.width, sourceCanvas.height, x, y, w, h);
+  return out;
+}
+
 async function captureRecap() {
   const btn = document.getElementById('btn-capture-recap');
   btn.disabled = true; btn.textContent = '⏳ Capture...';
@@ -1808,8 +1832,9 @@ async function captureRecap() {
     const canvas = await html2canvas(document.getElementById('recap-content'), {
       scale: 2, useCORS: true, backgroundColor: '#F5F7FA', logging: false,
     });
+    const a4 = fitToA4(canvas);
     const link = document.createElement('a');
-    link.href = canvas.toDataURL('image/jpeg', 0.92);
+    link.href = a4.toDataURL('image/jpeg', 0.92);
     link.download = 'Recap_' + currentRecapSal + '_' + new Date().toLocaleDateString('fr-FR').replace(/\//g,'-') + '.jpg';
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
     showToast('✅ Image téléchargée !', 2000);
@@ -1826,8 +1851,9 @@ async function captureCalendrier() {
     const canvas = await html2canvas(document.getElementById('calendrier-content'), {
       scale: 2, useCORS: true, backgroundColor: '#F5F7FA', logging: false,
     });
+    const a4 = fitToA4(canvas, 50, 'landscape');
     const link = document.createElement('a');
-    link.href = canvas.toDataURL('image/jpeg', 0.92);
+    link.href = a4.toDataURL('image/jpeg', 0.92);
     link.download = 'Calendrier_' + currentCalSalarie + '_' + moisLabel.replace(/\s/g,'_') + '.jpg';
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
     showToast('✅ Image téléchargée !', 2000);
@@ -1843,8 +1869,9 @@ async function captureSolde() {
     const canvas = await html2canvas(document.getElementById('solde-content'), {
       scale: 2, useCORS: true, backgroundColor: '#F5F7FA', logging: false,
     });
+    const a4 = fitToA4(canvas);
     const link = document.createElement('a');
-    link.href = canvas.toDataURL('image/jpeg', 0.92);
+    link.href = a4.toDataURL('image/jpeg', 0.92);
     link.download = 'Solde_' + new Date().toLocaleDateString('fr-FR').replace(/\//g,'-') + '.jpg';
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
     showToast('✅ Image téléchargée !', 2000);
@@ -1860,8 +1887,9 @@ async function captureMensuel() {
     const canvas = await html2canvas(document.getElementById('mensuel-content'), {
       scale: 2, useCORS: true, backgroundColor: '#F5F7FA', logging: false,
     });
+    const a4 = fitToA4(canvas);
     const link = document.createElement('a');
-    link.href = canvas.toDataURL('image/jpeg', 0.92);
+    link.href = a4.toDataURL('image/jpeg', 0.92);
     link.download = 'Mensuel_' + currentMensSalarie + '_' + moisNom.replace(/\s/g,'_') + '.jpg';
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
     showToast('✅ Image téléchargée !', 2000);
@@ -1884,8 +1912,9 @@ async function captureSemaine() {
       backgroundColor: '#F5F7FA',
       logging: false,
     });
+    const a4 = fitToA4(canvas);
     const link = document.createElement('a');
-    link.href = canvas.toDataURL('image/jpeg', 0.92);
+    link.href = a4.toDataURL('image/jpeg', 0.92);
     link.download = 'Semaine_' + currentSalarie + '_' + label.replace(/\s/g,'_') + '.jpg';
     document.body.appendChild(link);
     link.click();
