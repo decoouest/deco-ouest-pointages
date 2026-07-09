@@ -472,6 +472,12 @@ window.addEventListener('DOMContentLoaded', () => {
     <button class="sal-btn artiom"         onclick="setRecapSal('ARTIOM',this)">Artiom</button>
     <button class="sal-btn antonio"        onclick="setRecapSal('ANTONIO',this)">Antonio</button>
   </div>
+  <div style="margin-bottom:10px">
+    <button class="btn-save" onclick="captureRecap()" id="btn-capture-recap"
+            style="background:#2E7D32">
+      📸 Capturer le récap en image
+    </button>
+  </div>
   <div id="recap-content">
     <div class="loader"><div class="spinner"></div><div class="loader-text">Chargement...</div></div>
   </div>
@@ -494,6 +500,12 @@ window.addEventListener('DOMContentLoaded', () => {
   </div>
   <div id="calendrier-content">
     <div class="loader"><div class="spinner"></div><div class="loader-text">Chargement du calendrier...</div></div>
+  </div>
+  <div style="margin-top:8px">
+    <button class="btn-save" onclick="captureCalendrier()" id="btn-capture-calendrier"
+            style="background:#2E7D32">
+      📸 Capturer le calendrier en image
+    </button>
   </div>
   <div class="card" style="margin-top:8px">
     <div class="card-title">Légende</div>
@@ -1163,7 +1175,12 @@ async function loadCalendrier() {
 
 function renderCalendrier(weeksData, month) {
   const joursLabels = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+  const moisLabel = document.getElementById('cal-month-label')?.textContent || '';
   let html = '<div class="card">';
+  html += `<div style="text-align:center;margin-bottom:10px">
+    <div style="font-size:16px;font-weight:700;color:var(--blue)">${currentCalSalarie}</div>
+    <div style="font-size:12px;color:var(--text2)">${moisLabel}</div>
+  </div>`;
   // En-têtes
   html += '<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">';
   html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;flex:1">';
@@ -1783,6 +1800,41 @@ function afficherRemarque(date, texte) {
   modal.style.display = 'flex';
 }
 
+// ── CAPTURE RECAP ─────────────────────────────────────────────
+async function captureRecap() {
+  const btn = document.getElementById('btn-capture-recap');
+  btn.disabled = true; btn.textContent = '⏳ Capture...';
+  try {
+    const canvas = await html2canvas(document.getElementById('recap-content'), {
+      scale: 2, useCORS: true, backgroundColor: '#F5F7FA', logging: false,
+    });
+    const link = document.createElement('a');
+    link.href = canvas.toDataURL('image/jpeg', 0.92);
+    link.download = 'Recap_' + currentRecapSal + '_' + new Date().toLocaleDateString('fr-FR').replace(/\//g,'-') + '.jpg';
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    showToast('✅ Image téléchargée !', 2000);
+  } catch(err) { showToast('❌ ' + err.message, 4000); }
+  finally { btn.disabled = false; btn.textContent = '📸 Capturer le récap en image'; }
+}
+
+// ── CAPTURE CALENDRIER ────────────────────────────────────────
+async function captureCalendrier() {
+  const btn = document.getElementById('btn-capture-calendrier');
+  btn.disabled = true; btn.textContent = '⏳ Capture...';
+  try {
+    const moisLabel = document.getElementById('cal-month-label')?.textContent || 'Mois';
+    const canvas = await html2canvas(document.getElementById('calendrier-content'), {
+      scale: 2, useCORS: true, backgroundColor: '#F5F7FA', logging: false,
+    });
+    const link = document.createElement('a');
+    link.href = canvas.toDataURL('image/jpeg', 0.92);
+    link.download = 'Calendrier_' + currentCalSalarie + '_' + moisLabel.replace(/\s/g,'_') + '.jpg';
+    document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    showToast('✅ Image téléchargée !', 2000);
+  } catch(err) { showToast('❌ ' + err.message, 4000); }
+  finally { btn.disabled = false; btn.textContent = '📸 Capturer le calendrier en image'; }
+}
+
 // ── CAPTURE SOLDE & MENSUEL ──────────────────────────────────────
 async function captureSolde() {
   const btn = document.getElementById('btn-capture-solde');
@@ -2065,7 +2117,11 @@ async function loadRecap(sal) {
     }
   }
 
-  let html = `<div class="card" style="margin-bottom:10px">
+  let html = `<div class="card" style="margin-bottom:10px;text-align:center">
+    <div style="font-size:16px;font-weight:700;color:var(--blue)">${sal}</div>
+    <div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.8px">Récapitulatif annuel 2026</div>
+  </div>`;
+  html += `<div class="card" style="margin-bottom:10px">
     <button class="btn-save" onclick="telechargerPdfSalarie()" id="btn-pdf-salarie">
       📄 Télécharger le rapport PDF — ${sal}
     </button>
