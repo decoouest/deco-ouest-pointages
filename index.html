@@ -2080,10 +2080,11 @@ async function sauvegarder() {
 
   // 2. Sauvegarder heure de fin
   const isTrav = selectedType === 'Jour Travaillé' || selectedType === 'journee solidarité travaillé';
+  let r2 = { ok: true };
   if (isTrav) {
     const fin = document.getElementById('f-fin').value;
     if (fin) {
-      await apiGet({
+      r2 = await apiGet({
         action: 'saisir_fin',
         salarie: currentSalarie,
         row: currentSaisieRow.row,
@@ -2094,12 +2095,12 @@ async function sauvegarder() {
 
   // 3. Photo non envoyée vers Sheets (affichage local uniquement)
 
-  if (r1 && r1.ok) {
+  if (r1 && r1.ok && r2 && r2.ok) {
     showToast('✅ Enregistré dans Google Sheets !');
     hideSaisie();
     loadSemaine(currentSalarie);
   } else {
-    showToast('❌ Erreur : ' + (r1?.error || 'Échec'));
+    showToast('❌ Erreur : ' + (r1?.error || r2?.error || 'Échec'));
     btn.disabled = false;
     btn.textContent = 'Enregistrer dans Sheets';
   }
