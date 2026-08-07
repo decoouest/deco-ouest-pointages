@@ -349,9 +349,6 @@ window.addEventListener('DOMContentLoaded', () => {
     <button class="tab-btn" onclick="goTab('calendrier',this)">
       <i>🗓️</i>Calendrier
     </button>
-    <button class="tab-btn" onclick="goTab('historique',this)">
-      <i>📊</i>Historique
-    </button>
     <button class="tab-btn" onclick="goTab('config',this)">
       <i>⚙️</i>Config
     </button>
@@ -580,11 +577,6 @@ window.addEventListener('DOMContentLoaded', () => {
       <span style="display:inline-flex;align-items:center;gap:4px"><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:#E8EAF6;border:1px solid #3F51B5;flex-shrink:0"></span>Formation</span>
     </div>
   </div>
-</div>
-
-<!-- PAGE CONFIG -->
-<div id="page-historique" class="page">
-  <div id="historique-content"><div class="loader"><div class="spinner"></div><div class="loader-text">Chargement...</div></div></div>
 </div>
 
 <div id="page-config" class="page">
@@ -2536,45 +2528,6 @@ let currentWeekOffset = 0; // 0 = semaine en cours, -1 = semaine précédente, e
 document.getElementById('api-url').value = API_URL;
 
 // ── NAVIGATION ────────────────────────────────────────────────
-async function loadHistorique() {
-  const el = document.getElementById('historique-content');
-  if (!el) return;
-  if (!API_URL) { el.innerHTML = '<div class="card"><div class="empty">⚙️ Configurez l\'URL Apps Script</div></div>'; return; }
-  el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Chargement...</div></div>';
-  const salaries = ['ANATOLE','ARTIOM','ANTONIO'];
-  const MOIS = ['Jan.','Fév.','Mars','Avr.','Mai','Juin','Juil.','Août','Sept.','Oct.','Nov.','Déc.'];
-  const couleurs = ['var(--blue)','var(--green)','var(--amber)'];
-  const results = await Promise.all(salaries.map(s => apiGet({ action:'historique_recup', salarie: s })));
-  function fmt(m){const n=m<0,a=Math.abs(m);return (n?'-':'')+Math.floor(a/60)+':'+(('0'+(a%60)).slice(-2));}
-  let html = '<h2 style="font-size:16px;font-weight:700;color:var(--blue);margin-bottom:12px;padding:0 4px">📊 Historique récupération 2026</h2>';
-  results.forEach((data, si) => {
-    if (!data || !data.ok) return;
-    const couleur = couleurs[si];
-    html += `<div class="card" style="margin-bottom:12px;border-left:4px solid ${couleur}">`;
-    html += `<div class="card-title" style="color:${couleur}">${salaries[si]}</div>`;
-    html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px"><tr>';
-    MOIS.forEach((m,i) => {
-      html += `<th style="background:${couleur}22;color:${couleur};padding:4px 6px;border:1px solid ${couleur}33;font-weight:600">${m}</th>`;
-    });
-    html += '<th style="background:var(--gray-l);padding:4px 6px;border:1px solid #E0E0E0">Total</th></tr><tr>';
-    let total = 0;
-    data.historique.forEach((d,i) => {
-      total += d.creditMin;
-      const txt = d.creditMin > 0 ? `<span style="color:${couleur};font-weight:700">${d.credit}</span>` : '<span style="color:#CFD8DC">0:00</span>';
-      html += `<td style="text-align:center;padding:6px;border:1px solid #F0F0F0">${txt}</td>`;
-    });
-    html += `<td style="text-align:center;padding:6px;font-weight:700;color:${couleur}">${fmt(total)}</td></tr></table></div>`;
-    const maxMin = Math.max(...data.historique.map(d=>d.creditMin), 1);
-    html += '<div style="display:flex;align-items:flex-end;gap:3px;height:44px;margin-top:8px;padding:0 4px">';
-    data.historique.forEach(d => {
-      const h = Math.round((d.creditMin / maxMin) * 40);
-      html += `<div style="flex:1;height:${h}px;background:${couleur};border-radius:3px 3px 0 0;min-height:${d.creditMin>0?2:0}px" title="${d.credit}"></div>`;
-    });
-    html += '</div></div>';
-  });
-  el.innerHTML = html;
-}
-
 function goTab(name, btn) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -2583,7 +2536,6 @@ function goTab(name, btn) {
   if (name === 'solde')      loadSolde();
   if (name === 'semaine')    loadSemaine(currentSalarie);
   if (name === 'mensuel')    loadMensuel();
-  if (name === 'historique') loadHistorique();
   if (name === 'recap')      loadRecap(currentRecapSal);
   if (name === 'calendrier') loadCalendrier();
 }
