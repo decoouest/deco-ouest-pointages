@@ -640,22 +640,289 @@ async function sauvegarder() {
   } catch(e) { showToast('❌ ' + e.message, 5000); btn.disabled = false; btn.textContent = 'Enregistrer dans Sheets'; }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// MENSUEL — rendu complet (salaire 0:00 + départ anticipé)
+// ═══════════════════════════════════════════════════════════════
 async function loadMensuel() {
   const el = document.getElementById('mensuel-content');
-  if (!API_URL) { el.innerHTML = '<div class="empty">⚙️ Configurez l\'URL</div>'; return; }
-  el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Chargement du mois...</div></div>';
-  const data = await apiGet({ action: 'mois', salarie: currentMensSalarie, offset: currentMensMonthOffset });
-  if (!data || !data.ok) { el.innerHTML = '<div class="empty">❌ ' + (data?.error || 'Erreur') + '</div>'; return; }
+  if (!API_URL) { el.innerHTML = '<div class="empty">⚙️ Configurez l\'URL Apps Script</div>'; return; }
+
+  const cacheKey = 'mensuel_' + currentMensSalarie + '_' + currentMensMonthOffset;
+  const cached = CACHE[cacheKey];
+  if (cached && cached.mois) {
+    const moisNomCache = traduireMois(cached.nomMois || '');
+    document.getElementById('mens-month-label').textContent = moisNomCache.charAt(0).toUpperCase() + moisNomCache.slice(1);
+    try { renderMensuel(cached.mois, currentMensSalarie, moisNomCache, cached.semainesCompletes, cached.recupGlobal, cached.ijssServeur); } catch(e) {}
+  } else {
+    el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Chargement du mois...</div></div>';
+  }
+
+  const [data, dataSem, dataRecup, dataIjss] = await Promise.all([
+    apiGet({ action: 'mois', salarie: currentMensSalarie, offset: currentMensMonthOffset }),
+    apiGet({ action: 'moisCalendrier', salarie: currentMensSalarie, offset: currentMensMonthOffset }),
+    apiGet({ action: 'recuperation', salarie: currentMensSalarie }),
+    apiGet({ action: 'ijss', salarie: currentMensSalarie, offset: currentMensMonthOffset })
+  ]);
+
+  if (!data || !data.ok) {
+    if (!cached) el.innerHTML = '<div class="empty">❌ ' + (data?.error || 'Impossible de charger le mois') + '</div>';
+    return;
+  }
   const moisNom = traduireMois(data.nomMois || '');
   document.getElementById('mens-month-label').textContent = moisNom.charAt(0).toUpperCase() + moisNom.slice(1);
-  let html = '<div class="card" style="overflow-x:auto"><table class="mens-table"><tr><th>Date</th><th>Type</th><th>Travaillé</th><th>Écart</th></tr>';
-  for (const j of data.mois) {
-    html += '<tr><td>' + j.date + '</td><td>' + typeLabel(j.type) + '</td><td>' + (j.travaille || '—') + '</td><td>' + (j.ecart || '—') + '</td></tr>';
+  if (!data.mois || data.mois.length === 0) {
+    if (!cached) el.innerHTML = '<div class="empty">📅 Aucune donnée pour ce mois</div>';
+    return;
   }
-  html += '</table></div>';
-  el.innerHTML = html;
+  const semainesCompletes = (dataSem && dataSem.ok) ? dataSem.semaines : null;
+  const recupGlobal = (dataRecup && dataRecup.ok) ? dataRecup : null;
+  const ijssServeur = (dataIjss && dataIjss.ok) ? dataIjss : null;
+  CACHE[cacheKey] = { ...data, semainesCompletes, recupGlobal, ijssServeur };
+  try {
+    renderMensuel(data.mois, currentMensSalarie, moisNom, semainesCompletes, recupGlobal, ijssServeur);
+  } catch(err) {
+    el.innerHTML = '<div class="empty">❌ ' + err.message + '</div>';
+  }
 }
-async function telechargerPdfMensuel() { showToast('⚠️ Fonctionnalité PDF à finaliser'); }
+
+function renderMensuel(jours, sal, moisNom, semainesCompletes, recupGlobal, ijssServeur) {
+  const el = document.getElementById('mensuel-content');
+  function parseDateFr(str) { const [dd, mm, yyyy] = str.split('/').map(Number); return new Date(yyyy, mm - 1, dd); }
+  function lundiDe(d) { const j = (d.getDay() + 6) % 7; const l = new Date(d); l.setDate(d.getDate() - j); return l; }
+  const baseJourMinPour = (d) => (sal === 'ANTONIO' && d.getDay() !== 5) ? 8 * 60 : 7 * 60;
+  function parseDur(s) {
+    if (!s || s === '' || s === '0:00' || s === '0:00:00') return 0;
+    const neg = s.startsWith('-'); const c = s.replace('-', ''); const p = c.split(':');
+    const m = (parseInt(p[0]) || 0) * 60 + (parseInt(p[1]) || 0);
+    return neg ? -m : m;
+  }
+
+  // Regroupement par semaine
+  const semaines = {};
+  if (semainesCompletes && semainesCompletes.length) {
+    for (const s of semainesCompletes) {
+      const lundi = new Date(s.monday + 'T00:00:00');
+      const liste = (s.jours || []).filter(Boolean);
+      if (liste.length) semaines[lundi.getTime()] = liste;
+    }
+  } else {
+    for (const j of jours) {
+      const key = lundiDe(parseDateFr(j.date)).getTime();
+      if (!semaines[key]) semaines[key] = [];
+      semaines[key].push(j);
+    }
+  }
+  const moisAffiche = jours.length ? parseDateFr(jours[0].date).getMonth() : null;
+  const pad2 = n => String(n).padStart(2, '0');
+  const joursSemFr = ['dim','lun','mar','mer','jeu','ven','sam'];
+  for (const key in semaines) {
+    const lundi = new Date(Number(key));
+    const deja = new Set(semaines[key].map(j => j.date));
+    for (const off of [5, 6]) {
+      const d = new Date(lundi); d.setDate(d.getDate() + off);
+      const ds = pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1) + '/' + d.getFullYear();
+      if (!deja.has(ds) && estFerieDate(d)) {
+        semaines[key].push({ date: ds, jour: joursSemFr[d.getDay()], type: 'JOUR FERIE non travaillé', travaille: '', ecart: '' });
+      }
+    }
+    semaines[key].sort((a, b) => parseDateFr(a.date) - parseDateFr(b.date));
+  }
+
+  // Cumuls
+  let totalTravMin = 0, totalEcartMin = 0, totalMaj25Min = 0, totalAssimileMin = 0, totalMaj50Min = 0, totalBaseMin = 0;
+  let deductionDepartAnticipeMin = 0;
+  let nbRtt = 0, nbConge = 0, nbMaladie = 0, nbMaladieAvecSub = 0, nbMaladieSansSub = 0, nbAbs = 0, nbAbsNonRem = 0, nbCongeSansSolde = 0, nbFerie = 0;
+  const congeDatesArr = [];
+
+  let rows = '';
+  for (const key of Object.keys(semaines).map(Number).sort((a, b) => a - b)) {
+    const js = semaines[key];
+    let wTrav = 0, wBase = 0, wAssim = 0, wBaseMois = 0, wTravHS = 0, wFerie = 0, wRtt = 0, wConge = 0, wArretMal = false, wEcart = 0;
+
+    for (const j of js) {
+      const type = j.type || '';
+      const dL = parseDateFr(j.date);
+      const estDuMois = (moisAffiche === null) || (dL.getMonth() === moisAffiche);
+      const isTrav = type === 'Jour Travaillé' || type === 'journee solidarité travaillé';
+      const isWeekend = type === 'week end';
+      const congeEstFerie = (type === 'CONGE' || type === 'congé sans solde') && estFerieDate(dL);
+      const isConge = (type === 'CONGE' || type === 'congé sans solde') && !congeEstFerie;
+      const isRtt = type === 'RTT';
+      const isMal = estTypeMaladie(type);
+      const isAbs = type === 'ABSENT' || isMal || type === 'absences non rémunérées avec retenue sur salaire';
+      const isFer = type === 'JOUR FERIE non travaillé' || congeEstFerie;
+
+      let rowClass = '';
+      if (isWeekend) rowClass = 'weekend';
+      else if (j.isToday) rowClass = 'today-row';
+      else if (isConge) rowClass = 'conge';
+      else if (isRtt) rowClass = 'rtt';
+      else if (isAbs) rowClass = 'absent';
+      else if (isFer) rowClass = 'ferie';
+
+      if (estDuMois) {
+        if (isTrav) {
+          if (j.travaille) totalTravMin += parseDur(j.travaille);
+          if (j.ecart) totalEcartMin += parseDur(j.ecart);
+          // ⭐ Départ anticipé en mode retenue
+          if (j.remarque && j.remarque.startsWith('[[RETENUE-DA]]') && j.ecart) {
+            const ec = parseDur(j.ecart);
+            if (ec < 0) deductionDepartAnticipeMin += -ec;
+          }
+        }
+        if (type === 'ABSENT' || type === 'absences non rémunérées avec retenue sur salaire') nbAbs++;
+        if (type === 'absences non rémunérées avec retenue sur salaire' || type === 'ABSENT') nbAbsNonRem++;
+        if (type === 'congé sans solde' && !congeEstFerie) nbCongeSansSolde++;
+        if (isMal) nbMaladie++;
+        if (estMaladieAvecSubrogation(type)) nbMaladieAvecSub++;
+        if (estMaladieSansSubrogation(type)) nbMaladieSansSub++;
+        if (isRtt) nbRtt++;
+        if (isConge) { nbConge++; congeDatesArr.push(new Date(dL)); }
+        if (isFer) nbFerie++;
+      }
+
+      const dJour = parseDateFr(j.date);
+      if (dJour.getDay() !== 0 && dJour.getDay() !== 6) {
+        const bj = baseJourMinPour(dJour);
+        if (isMal) wArretMal = true;
+        if (type === 'Jour Travaillé' && j.travaille) { const t = parseDur(j.travaille); wTrav += t; wTravHS += t; }
+        if (type === 'journee solidarité travaillé' && j.travaille) { const t = parseDur(j.travaille); wTrav += t; wTravHS += t; }
+        if (estAssimile(type)) {
+          wAssim += bj; wBase += bj;
+          if (isFer) wFerie += bj;
+          else if (isRtt) wRtt += bj;
+          else if (isConge) { wConge += bj; wTravHS += bj; }
+          if (estDuMois) { totalAssimileMin += bj; wBaseMois += bj; }
+        } else if (estNeutralise(type)) {
+          // neutralisé
+        } else if (type !== 'week end') {
+          wBase += bj;
+          if (estDuMois) wBaseMois += bj;
+        }
+        if (isTrav && j.ecart) wEcart += parseDur(j.ecart);
+      }
+
+      const [dd, mm] = j.date.split('/');
+      const jc = j.jour ? j.jour.substring(0, 3) : '';
+      const travStr = isTrav && j.travaille ? cleanTime(j.travaille) : '—';
+      const ecartStr = isTrav && j.ecart && j.ecart !== '0:00' ? cleanTime(j.ecart) : '—';
+      const ecartCls = (isTrav && j.ecart && j.ecart !== '0:00') ? (j.ecart.startsWith('-') ? ' ecart-neg' : ' ecart-pos') : '';
+
+      if (estDuMois) rows += '<tr class="' + rowClass + '"><td><strong>' + dd + '/' + mm + '</strong></td><td>' + jc + '</td><td class="type-badge">' + typeLabel(type) + '</td><td class="mens-trav-col">' + travStr + '</td><td class="mens-ecart-col' + ecartCls + '">' + ecartStr + '</td>' + (sal !== 'ANTONIO' ? '<td style="color:#B0BEC5">—</td>' : '') + '<td></td></tr>';
+    }
+
+    const wPrise = wTrav + wAssim;
+    let wMaj25 = 0, wMaj50 = 0, wTot = 0;
+    if (sal === 'ANTONIO') wTot = wPrise;
+    else {
+      const S_HS = 35 * 60, S_50 = 43 * 60;
+      if (wTravHS > S_HS) {
+        const h25 = Math.min(wTravHS, S_50) - S_HS;
+        const h50 = Math.max(0, wTravHS - S_50);
+        wMaj25 = Math.round(Math.max(0, h25) * 1.25);
+        wMaj50 = Math.round(h50 * 1.5);
+      }
+      wTot = wArretMal ? wPrise : wBase;
+    }
+    const wRecup = wMaj25 + wMaj50;
+    const vend = new Date(key); vend.setDate(vend.getDate() + 4);
+    const hsMois = (vend.getMonth() === moisAffiche);
+    if (hsMois) { totalMaj25Min += wMaj25; totalMaj50Min += wMaj50; }
+    totalBaseMin += wBaseMois;
+
+    const lundi = new Date(key);
+    const finS = new Date(key); finS.setDate(finS.getDate() + 6);
+    const fmt = (d) => pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1);
+    const ecartS = wPrise - wBase;
+    const nbCol = sal !== 'ANTONIO' ? 7 : 6;
+    const semStatut = wArretMal ? 'sem-warn' : ecartS >= 0 ? 'sem-ok' : ecartS >= -30 ? 'sem-warn' : 'sem-alert';
+    rows += '<tr class="semaine-total ' + semStatut + '"><td colspan="3" style="text-align:left">▶ Sem. ' + fmt(lundi) + ' → ' + fmt(finS) + '</td><td>' + minsToStr2(wTrav) + (wAssim > 0 ? ' <span style="font-size:9px;color:#F9A825">+' + minsToStr2(wAssim) + '</span>' : '') + '</td><td class="' + (ecartS >= 0 ? 'ecart-pos' : 'ecart-neg') + '">' + minsToStr2(ecartS) + '</td>' + (sal !== 'ANTONIO' ? '<td>' + (hsMois ? minsToStr2(wRecup) : '—') + '</td>' : '') + '<td class="fort">' + minsToStr2(wTot) + '</td></tr>';
+  }
+
+  const BM = Math.round((sal === 'ANTONIO' ? 39 : 35) * 52 / 12 * 60);
+  const BNorm = Math.round(35 * 52 / 12 * 60);
+  const BMaj = BM - BNorm;
+  const hJour = (sal === 'ANTONIO' ? 8 : 7) * 60;
+  const dedMin = (nbAbsNonRem + nbCongeSansSolde) * hJour;
+  const congesMin = nbConge * hJour;
+  const nbMalLegacy = nbMaladie - nbMaladieAvecSub - nbMaladieSansSub;
+  const dedMal = (nbMalLegacy + nbMaladieSansSub) * hJour;
+  const annee = jours.length ? parseDateFr(jours[0].date).getFullYear() : new Date().getFullYear();
+  let ijssSaisie = { ijss: 0, maintien: 0 };
+  if (ijssServeur && ijssServeur.ok) ijssSaisie = { ijss: strToMin(ijssServeur.ijss), maintien: strToMin(ijssServeur.maintien) };
+  const ijssMin = ijssSaisie.ijss || 0, maintMin = ijssSaisie.maintien || 0;
+
+  // ⭐ Règle : salaire = 0 si aucun travail effectif
+  const aTrav = totalTravMin > 0;
+  const aJustif = (nbRtt > 0) || (nbFerie > 0) || (nbMaladieAvecSub > 0);
+  const totalPayeMin = (aTrav || aJustif) ? Math.max(0, BM - dedMin - congesMin - dedMal - deductionDepartAnticipeMin + ijssMin + maintMin) : 0;
+
+  window.__lastMensuelArgs = [jours, sal, moisNom, semainesCompletes, recupGlobal, ijssServeur];
+  const header = sal === 'ANTONIO'
+    ? '<tr><th>Date</th><th>Jour</th><th>Type</th><th>Travaillé</th><th>Écart</th><th>Total sem.</th></tr>'
+    : '<tr><th>Date</th><th>Jour</th><th>Type</th><th>Travaillé</th><th>Écart</th><th>Crédit récup.</th><th>Total sem.</th></tr>';
+
+  let html = '<div class="card" style="overflow-x:auto"><div style="display:flex;justify-content:space-between;margin-bottom:10px"><span style="font-weight:700;font-size:15px;color:var(--blue)">' + sal + '</span><span style="font-weight:600;font-size:13px;color:var(--text2)">' + moisNom.charAt(0).toUpperCase() + moisNom.slice(1) + '</span></div><table class="mens-table">' + header + rows + '</table></div>';
+
+  // Temps de travail
+  html += '<div class="card" style="margin-top:10px;border-left:4px solid var(--gray)"><div class="card-title">⏱️ Temps de travail</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
+    + '<div style="background:var(--blue-l);border-radius:10px;padding:12px"><div style="font-size:12px;color:var(--blue);font-weight:600">🟦 Travail effectif</div><div style="font-size:22px;font-weight:700;color:var(--blue);margin-top:4px">' + minsToStr2(totalTravMin) + '</div></div>'
+    + '<div style="background:var(--green-l);border-radius:10px;padding:12px"><div style="font-size:12px;color:var(--green);font-weight:600">🟩 Temps assimilé</div><div style="font-size:22px;font-weight:700;color:var(--green);margin-top:4px">' + minsToStr2(totalAssimileMin) + '</div></div>'
+    + '<div style="background:var(--gray-l);border-radius:10px;padding:12px"><div style="font-size:12px;color:var(--text2);font-weight:600">⚪ Base théorique</div><div style="font-size:22px;font-weight:700;color:var(--text2);margin-top:4px">' + minsToStr2(totalBaseMin) + '</div></div>'
+    + '<div style="background:' + (totalEcartMin >= 0 ? 'var(--green-l)' : 'var(--red-l)') + ';border-radius:10px;padding:12px"><div style="font-size:12px;color:' + (totalEcartMin >= 0 ? 'var(--green)' : 'var(--red)') + ';font-weight:600">' + (totalEcartMin >= 0 ? '🟢' : '🔴') + ' Écart</div><div style="font-size:22px;font-weight:700;color:' + (totalEcartMin >= 0 ? 'var(--green)' : 'var(--red)') + ';margin-top:4px">' + minsToStr2(totalEcartMin) + '</div></div>'
+    + '</div></div>';
+
+  // Compteur paie
+  html += '<div class="card" style="margin-top:10px;border-left:4px solid var(--blue)"><div class="card-title" style="color:var(--blue)">💰 Compteur paie</div><div style="background:#F8FBFF;border-radius:10px;padding:14px 16px">';
+  if (sal === 'ANTONIO') {
+    html += '<div style="display:flex;justify-content:space-between"><span style="font-size:13px;color:var(--text2)">Base 151,67h</span><span style="font-size:16px;font-weight:700;color:var(--blue)">' + minsToStr2(BNorm) + '</span></div>'
+      + '<div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:13px;color:var(--text2)">+ 17,33h maj. 25%</span><span style="font-size:16px;font-weight:700;color:var(--blue)">' + minsToStr2(BMaj) + '</span></div>'
+      + '<div style="border-top:1px dashed #B0BEC5;margin:8px 0"></div>';
+  }
+  html += '<div style="display:flex;justify-content:space-between"><span style="font-size:13px;color:var(--text2);font-weight:600">= Base mensuelle</span><span style="font-size:18px;font-weight:700;color:var(--blue)">' + minsToStr2(BM) + '</span></div>';
+  if (congesMin > 0) html += '<div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:13px;color:var(--text2)">− Congés CIBTP</span><span style="font-size:18px;font-weight:700;color:var(--green)">' + minsToStr2(congesMin) + '</span></div>';
+  if (dedMin > 0) html += '<div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:13px;color:var(--text2)">− Abs. non rém.</span><span style="font-size:18px;font-weight:700;color:var(--red)">' + minsToStr2(dedMin) + '</span></div>';
+  if (deductionDepartAnticipeMin > 0) html += '<div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:13px;color:var(--text2)">− Départs anticipés (retenue)</span><span style="font-size:18px;font-weight:700;color:var(--red)">' + minsToStr2(deductionDepartAnticipeMin) + '</span></div>';
+  if (nbMaladie > 0) {
+    html += '<div style="border-top:1px dashed #B0BEC5;margin:10px 0"></div>'
+      + '<div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:4px">🏥 Maladie (' + nbMaladie + ' j.)</div>';
+    if (nbMaladieAvecSub > 0) html += '<div style="display:flex;justify-content:space-between"><span style="font-size:13px;color:var(--text2)">Avec subrogation</span><span style="font-size:14px;font-weight:700;color:var(--green)">maintenu</span></div>';
+    if (nbMaladieSansSub > 0) html += '<div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:13px;color:var(--text2)">− Sans subrogation</span><span style="font-size:14px;font-weight:700;color:var(--red)">' + minsToStr2(nbMaladieSansSub * hJour) + '</span></div>';
+    if (nbMalLegacy > 0) {
+      html += '<div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:13px;color:var(--text2)">− Déduction (type gén.)</span><span style="font-size:14px;font-weight:700;color:var(--red)">' + minsToStr2(nbMalLegacy * hJour) + '</span></div>'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px"><span style="font-size:13px;color:var(--text2)">+ IJSS</span><input type="text" id="ijss-input" value="' + minsToStr2(ijssMin) + '" onchange="updateIjssMaladie(\'' + sal + '\',' + annee + ',' + moisAffiche + ')" style="width:70px;text-align:right;font-size:14px;font-weight:700;color:var(--green);border:1px solid #B0BEC5;border-radius:6px;padding:3px 6px"></div>'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px"><span style="font-size:13px;color:var(--text2)">+ Maintien</span><input type="text" id="maintien-input" value="' + minsToStr2(maintMin) + '" onchange="updateIjssMaladie(\'' + sal + '\',' + annee + ',' + moisAffiche + ')" style="width:70px;text-align:right;font-size:14px;font-weight:700;color:var(--green);border:1px solid #B0BEC5;border-radius:6px;padding:3px 6px"></div>';
+    }
+  }
+  html += '<div style="border-top:1px dashed #B0BEC5;margin:10px 0"></div>';
+  if (!aTrav && !aJustif) html += '<div style="margin:8px 0;padding:8px 10px;background:var(--red-l);border-left:3px solid var(--red);border-radius:4px;font-size:11px;color:var(--red);font-weight:600">⚠️ Aucune heure de travail effectif — salaire employeur = 0:00</div>';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--blue);border-radius:8px;padding:10px 12px"><span style="font-size:12px;color:rgba(255,255,255,.85);font-weight:600">Salaire employeur</span><span style="font-size:20px;font-weight:700;color:white">' + minsToStr2(totalPayeMin) + '</span></div>';
+  html += '</div></div>';
+
+  // Compteur récupération
+  if (sal !== 'ANTONIO') {
+    html += '<div class="card" style="margin-top:10px;border-left:4px solid var(--green)"><div class="card-title" style="color:var(--green)">🔄 Compteur récupération</div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">'
+      + '<div class="mens-total-card" style="background:#E8F5E9;border:1px solid var(--green)"><div class="val" style="color:var(--green)">' + minsToStr2(totalMaj25Min + totalMaj50Min) + '</div><div class="lbl" style="color:var(--green);font-weight:600">Crédit ce mois</div></div>'
+      + '<div class="mens-total-card"><div class="val" style="color:var(--blue)">' + minsToStr2(totalMaj25Min) + '</div><div class="lbl">HS 25%</div></div>'
+      + '<div class="mens-total-card"><div class="val" style="color:var(--text2)">' + minsToStr2(totalMaj50Min) + '</div><div class="lbl">HS 50%</div></div>'
+      + '</div>';
+    if (recupGlobal && recupGlobal.ok) {
+      const r = recupGlobal;
+      const col = r.soldeMin < 0 ? 'var(--red)' : 'var(--green)';
+      html += '<div style="margin-top:8px;padding-top:8px;border-top:1px dashed #A5D6A7"><div style="font-size:11px;color:var(--text2);margin-bottom:6px">📊 Solde depuis le 01/01</div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+        + '<div style="text-align:center;background:var(--gray-l);border-radius:8px;padding:6px 10px"><div style="font-size:12px;font-weight:700">' + r.report + '</div><div style="font-size:9px;color:var(--text2)">Report</div></div>'
+        + '<div style="text-align:center;background:var(--blue-l);border-radius:8px;padding:6px 10px"><div style="font-size:12px;font-weight:700">+' + r.acquis + '</div><div style="font-size:9px;color:var(--text2)">Acquis</div></div>'
+        + '<div style="text-align:center;background:#FFF8E1;border-radius:8px;padding:6px 10px"><div style="font-size:12px;font-weight:700">-' + r.pris + '</div><div style="font-size:9px;color:var(--text2)">RTT pris</div></div>'
+        + '<div style="flex:1;text-align:center;border-radius:8px;padding:6px 12px;background:' + (r.soldeMin >= 0 ? '#E8F5E9' : 'var(--red-l)') + ';border:2px solid ' + col + '"><div style="font-size:18px;font-weight:700;color:' + col + '">' + r.solde + '</div><div style="font-size:9px;font-weight:600;color:' + col + '">SOLDE FINAL</div></div>'
+        + '</div></div>';
+    }
+    html += '</div>';
+  }
+
+  el.innerHTML = html;
+}() { showToast('⚠️ Fonctionnalité PDF à finaliser'); }
 async function loadRecap(sal) {
   const el = document.getElementById('recap-content');
   if (!API_URL) { el.innerHTML = '<div class="empty">⚙️ Configurez l\'URL</div>'; return; }
