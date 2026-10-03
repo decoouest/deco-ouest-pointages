@@ -2450,9 +2450,13 @@ function refreshAll() {
 // 2) ICON_SVG      → commence par "data:image/svg+xml;base64,"
 // 3) LOGO_PNG      → commence par "data:image/png;base64,"
 // Copiez toute la valeur jusqu'au guillemet fermant.
- {
+// BASE64 (à remplir avec les valeurs de votre ancien fichier)
+// ...
+
+(function injectB64() {          ← ✅ LA LIGNE AJOUTÉE
   try {
-    if (DEO_B64.MANIFEST && !DEO_B64.MANIFEST.startsWith('REMPLACER')) document.getElementById('deo-manifest').setAttribute('href', DEO_B64.MANIFEST);
+    if (DEO_B64.MANIFEST && !DEO_B64.MANIFEST.startsWith('REMPLACER'))
+      document.getElementById('deo-manifest').setAttribute('href', DEO_B64.MANIFEST);
     if (DEO_B64.ICON_SVG && !DEO_B64.ICON_SVG.startsWith('REMPLACER')) {
       document.getElementById('deo-apple-icon').setAttribute('href', DEO_B64.ICON_SVG);
       document.getElementById('deo-favicon').setAttribute('href', DEO_B64.ICON_SVG);
@@ -2464,18 +2468,11 @@ function refreshAll() {
   } catch(e) {}
 })();
 
-// ═══════════════════════════════════════════════════════════════
 // INIT
-// ═══════════════════════════════════════════════════════════════
 window.addEventListener('load', async () => {
   setStatus('Connexion...');
   await loadSolde();
 });
-     const DEO_B64 = {
-  MANIFEST: 'REMPLACER_PAR_LA_VALEUR_ORIGINALE_DU_MANIFEST',
-  ICON_SVG: 'REMPLACER_PAR_LA_VALEUR_ORIGINALE_DE_L_ICONE_SVG',
-  LOGO_PNG: 'REMPLACER_PAR_LA_VALEUR_ORIGINALE_DU_LOGO_PNG',
-};
 </script>
 </body>
 </html>
