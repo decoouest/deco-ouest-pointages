@@ -2452,6 +2452,11 @@ function refreshAll() {
 // Copiez toute la valeur jusqu'au guillemet fermant.
 // BASE64 (à remplir avec les valeurs de votre ancien fichier)
 // ...
+const DEO_B64 = {
+  MANIFEST: 'REMPLACER_PAR_LA_VALEUR_ORIGINALE_DU_MANIFEST',
+  ICON_SVG: 'REMPLACER_PAR_LA_VALEUR_ORIGINALE_DE_L_ICONE_SVG',
+  LOGO_PNG: 'REMPLACER_PAR_LA_VALEUR_ORIGINALE_DU_LOGO_PNG',
+};
 
 (function injectB64() {          ← ✅ LA LIGNE AJOUTÉE
   try {
