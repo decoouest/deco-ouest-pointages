@@ -1578,11 +1578,16 @@ function renderMensuel(jours, sal, moisNom, semainesCompletes, recupGlobal, ijss
   html += '</div></div>';
 
   if (sal !== 'ANTONIO') {
-    html += '<div class="card" style="margin-top:10px;border-left:4px solid var(--green)"><div class="card-title" style="color:var(--green)">🔄 Compteur récupération</div>'
+        html += '<div class="card" style="margin-top:10px;border-left:4px solid var(--green)"><div class="card-title" style="color:var(--green)">🔄 Compteur récupération</div>'
       + '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">'
       + '<div class="mens-total-card" style="background:#E8F5E9;border:1px solid var(--green)"><div class="val" style="color:var(--green)">' + minsToStr2(tM25+tM50) + '</div><div class="lbl" style="color:var(--green);font-weight:600">Crédit ce mois</div></div>'
       + '<div class="mens-total-card"><div class="val" style="color:var(--blue)">' + minsToStr2(tM25) + '</div><div class="lbl">HS 25%</div></div>'
       + '<div class="mens-total-card"><div class="val" style="color:var(--text2)">' + minsToStr2(tM50) + '</div><div class="lbl">HS 50%</div></div>'
+      + (detteRecupMin > 0 ? '<div class="mens-total-card" style="background:var(--amber-l);border:1px solid var(--amber)"><div class="val" style="color:var(--amber)">−' + minsToStr2(detteRecupMin) + '</div><div class="lbl" style="color:var(--amber);font-weight:600">Départ anticipé</div></div>' : '')
+      + '</div>'
+      + '<div style="background:#F8FBFF;border-radius:8px;padding:10px 12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">'
+      + '<span style="font-size:13px;color:var(--text2);font-weight:600">Solde net du mois</span>'
+      + '<span style="font-size:16px;font-weight:700;color:' + ((tM25+tM50-detteRecupMin) >= 0 ? 'var(--green)' : 'var(--red)') + '">' + minsToStr2(tM25+tM50-detteRecupMin) + '</span>'
       + '</div>';
     html += renderSoldeCumul(recupGlobal);
     html += '</div>';
