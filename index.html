@@ -1481,7 +1481,16 @@ function renderMensuel(jours, sal, moisNom, semainesCompletes, recupGlobal, ijss
       const eS = isT && j.ecart && j.ecart !== '0:00' ? cleanTime(j.ecart) : '—';
       const eC = (isT && j.ecart && j.ecart !== '0:00') ? (j.ecart.startsWith('-') ? ' ecart-neg' : ' ecart-pos') : '';
 
-      if (duMois) rows += '<tr class="' + cls + '"><td><strong>' + dd + '/' + mm + '</strong></td><td>' + jc + '</td><td style="font-size:9px">' + (buildTooltip(t) || typeLabelCourt(t)) + '</td><td class="mens-trav-col">' + tS + '</td><td class="mens-ecart-col' + eC + '">' + eS + '</td>' + (sal !== 'ANTONIO' ? '<td style="color:#B0BEC5">—</td>' : '') + '<td></td></tr>';
+           if (duMois) {
+        // Indicateur visuel du mode DA
+        let daTag = '';
+        if (isT && j.remarque && j.ecart && j.ecart.startsWith('-')) {
+          daTag = j.remarque.startsWith('[[RETENUE-DA]]')
+            ? ' <span title="Départ anticipé — retenue salaire" style="font-size:10px">💸</span>'
+            : ' <span title="Départ anticipé — dette récupération" style="font-size:10px">⏳</span>';
+        }
+        rows += '<tr class="' + cls + '"><td><strong>' + dd + '/' + mm + '</strong></td><td>' + jc + '</td><td style="font-size:9px">' + (buildTooltip(t) || typeLabelCourt(t)) + daTag + '</td><td class="mens-trav-col">' + tS + '</td><td class="mens-ecart-col' + eC + '">' + eS + '</td>' + (sal !== 'ANTONIO' ? '<td style="color:#B0BEC5">—</td>' : '') + '<td></td></tr>';
+      }
     }
 
     const wPrise = wTrav + wAssim;
