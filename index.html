@@ -362,6 +362,7 @@ window.addEventListener('DOMContentLoaded',()=>{if(sessionStorage.getItem('deo_a
 
 <!-- ═══════════════════════════════════════════════════════════════
      FIN PARTIE 1/3
+     ═══════════════════════════════════════════════════════════════ -->
   <script>
 
 // ═══════════════════════════════════════════════════════════════
@@ -820,8 +821,7 @@ async function sauvegarder() {
 
 // ═══════════════════════════════════════════════════════════════
 // FIN PARTIE 2/3 — Le <script> reste ouvert
-// ═══════════════════════════════════════════════════════════════
-  
+// ════════════════════════════════════
 // ═══════════════════════════════════════════════════════════════
 // MENSUEL
 // ═══════════════════════════════════════════════════════════════
@@ -1197,5 +1197,375 @@ function renderCalendrier(weeksData, month) {
   html += '</div><div class="cal-total-head" style="min-width:44px;width:44px">Total</div></div>';
   let totalMoisMin = 0;
   const hhm = s => { if (!s || s === '' || s === '0:00' || s === '0:00:00') return 0; const p = s.replace('-','').split(':'); return (parseInt(p[0])||0)*60 + (parseInt(p[1])||0); };
-  const mh = m => Math.floor
-     ═══════════════════════════════════════════════════════════════ -->
+  const mh = m => Math.floor(m/60) + ':' + (m%60).toString().padStart(2,'0');
+  for (const week of weeksData) {
+    let wMin = 0, baseA = (currentCalSalarie === 'ANTONIO' ? 39 : 35) * 60, aMal = false;
+    let wMinM = 0, baseAM = 0, aMalM = false, aDM = false;
+    const bjJ = idx => (currentCalSalarie === 'ANTONIO' && idx !== 4) ? 8*60 : 7*60;
+    html += '<div style="display:flex;gap:6px;align-items:stretch;margin-bottom:4px"><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;flex:1">';
+    for (let i = 0; i < 5; i++) {
+      html += renderCalCell(week.jours[i], month);
+      const bj = bjJ(i);
+      const dJ = new Date(week.monday); dJ.setDate(dJ.getDate() + i);
+      const inM = dJ.getMonth() === month;
+      if (inM) aDM = true;
+      const j = week.jours[i];
+      if (j) {
+        const isT = j.type === 'Jour Travaillé', isS = j.type === 'journee solidarité travaillé', isF = j.type === 'JOUR FERIE non travaillé';
+        const isA = ['CONGE','RTT','ABSENT','ARRET TRAVAIL MALADIE','ARRET MALADIE AVEC SUBROGATION','ARRET MALADIE SANS SUBROGATION','congé sans solde','absences non rémunérées avec retenue sur salaire'].includes(j.type);
+        if (estTypeMaladie(j.type)) { aMal = true; if (inM) aMalM = true; }
+        if (isT && j.travaille) { wMin += hhm(j.travaille); if (inM) wMinM += hhm(j.travaille); }
+        if (isS && j.travaille) { const d = hhm(j.travaille) - bj; if (d > 0) { wMin += d; if (inM) wMinM += d; } }
+        if (isF) { wMin += bj; if (inM) { wMinM += bj; baseAM += bj; } }
+        if (isA) baseA -= bj;
+        else if (inM && !isF) baseAM += bj;
+      } else baseA -= bj;
+    }
+    for (let i = 5; i < 7; i++) {
+      const dt = new Date(week.monday); dt.setDate(dt.getDate() + i);
+      const inM = dt.getMonth() === month;
+      const fW = estFerieDate(dt);
+      html += '<div class="cal-cell weekend ' + (inM ? '' : 'out-month') + '" style="' + (fW ? 'background:#FFF9C4' : '') + '"><div class="cal-daynum">' + dt.getDate() + '</div>' + (fW ? '<div class="cal-extra">🎉</div>' : '') + '</div>';
+    }
+    html += '</div>';
+    const today = new Date(); today.setHours(0,0,0,0);
+    const semF = week.monday > today;
+    let aD = false;
+    for (let i = 0; i < 5; i++) { const j = week.jours[i]; if (j && j.travaille && j.travaille !== '' && j.travaille !== '0:00' && j.travaille !== '0:00:00') { aD = true; break; } }
+    let wTM = wMinM;
+    if (currentCalSalarie !== 'ANTONIO') { const e = wMinM - baseAM; const m = e > 0 ? Math.round(e * 1.25) : 0; wTM = aMalM ? (wMinM + m) : (baseAM + m); }
+    if (semF && !aD) html += '<div class="cal-total-cell">—</div>';
+    else { if (aDM) totalMoisMin += wTM; html += '<div class="cal-total-cell">' + mh(wTM) + '</div>'; }
+    html += '</div>';
+  }
+  html += '</div><div class="cal-total-mois"><div class="lbl">Total du mois</div><div class="val">' + mh(totalMoisMin) + '</div></div>';
+  html += '<button class="btn-save" style="margin-top:10px" onclick="telechargerPdfCalendrier()">📄 Télécharger en PDF</button></div>';
+  document.getElementById('calendrier-content').innerHTML = html;
+}
+
+function renderCalCell(j, month) {
+  if (!j) return '<div class="cal-cell empty"></div>';
+  const [dd, mm] = j.date.split('/').map(Number);
+  const inM = (mm - 1) === month;
+  let ex = '';
+  const isT = j.type === 'Jour Travaillé' || j.type === 'journee solidarité travaillé';
+  if (isT && j.travaille && j.travaille !== '0:00') ex = cleanTime(j.travaille);
+  else if (j.type && j.type !== '') ex = calAbbr(j.type);
+  const n = natureOf(j.type || '');
+  const bg = n ? n.couleur : '#F5F7FA';
+  return '<div class="cal-cell" style="cursor:pointer;background:' + (inM ? bg : '#F5F7FA') + ';opacity:' + (inM ? 1 : 0.4) + '" onclick="openSaisieFromCalendrier(' + JSON.stringify(j).replace(/"/g, '&quot;') + ')"><div class="cal-daynum">' + dd + '</div><div class="cal-extra">' + ex + '</div></div>';
+}
+
+function openSaisieFromCalendrier(jour) {
+  if (!jour || !jour.row) return;
+  currentSalarie = currentCalSalarie;
+  const [dd, mm, yyyy] = jour.date.split('/').map(Number);
+  const jc = new Date(yyyy, mm - 1, dd);
+  const lc = new Date(jc); lc.setDate(jc.getDate() - ((jc.getDay()+6)%7));
+  const today = new Date(); today.setHours(0,0,0,0);
+  const lt = new Date(today); lt.setDate(today.getDate() - ((today.getDay()+6)%7));
+  currentWeekOffset = Math.round((lc - lt) / (7 * 24 * 60 * 60 * 1000));
+  document.querySelectorAll('#page-semaine .sal-btn').forEach(b => { const n = b.textContent.trim().toUpperCase(); b.classList.toggle('active', n === currentSalarie); });
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-semaine').classList.add('active');
+  const tb = document.querySelector('.tab-btn[onclick*="\'semaine\'"]');
+  if (tb) tb.classList.add('active');
+  loadSemaine(currentSalarie);
+  openSaisie(jour);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PDF CALENDRIER
+// ═══════════════════════════════════════════════════════════════
+async function telechargerPdfCalendrier() {
+  const btn = document.querySelector('#page-calendrier .btn-save');
+  if (!btn) return;
+  btn.disabled = true; btn.textContent = '⏳ Génération...';
+  try {
+    const now = new Date();
+    const target = new Date(now.getFullYear(), now.getMonth() + currentCalMonthOffset, 1);
+    const moisNom = target.toLocaleDateString('fr-FR', {month:'long', year:'numeric'});
+    const moisNomFr = moisNom.charAt(0).toUpperCase() + moisNom.slice(1);
+    const data = await apiGet({ action: 'mois', salarie: currentCalSalarie, offset: currentCalMonthOffset });
+    if (!data || !data.ok) { showToast('❌ Impossible', 4000); btn.disabled = false; btn.textContent = '📄 Télécharger en PDF'; return; }
+    const jMap = {}; for (const j of data.mois) jMap[j.date] = j;
+    const hhm = s => { if (!s || s === '' || s === '0:00' || s === '0:00:00') return 0; const p = s.replace('-','').split(':'); return (parseInt(p[0])||0)*60 + (parseInt(p[1])||0); };
+    const mh = m => Math.floor(m/60) + ':' + (m%60).toString().padStart(2,'0');
+    const cT = t => { if (!t || t === 'Jour Travaillé' || t === 'journee solidarité travaillé') return '#E3F2FD'; if (t === 'CONGE' || t === 'congé sans solde') return '#E8F5E9'; if (t === 'RTT' || t === 'FORMATION') return '#F3E5F5'; if (t === 'ABSENT' || estTypeMaladie(t) || t === 'ACCIDENT TRAVAIL' || t === 'MISE A PIED' || t === 'absences non rémunérées avec retenue sur salaire') return '#FFEBEE'; if (t === 'JOUR FERIE non travaillé') return '#FFF9C4'; return '#ECEFF1'; };
+    const lT = t => { if (t === 'CONGE') return 'Congé'; if (t === 'RTT') return 'RTT'; if (t === 'ABSENT') return 'Absent'; if (t === 'JOUR FERIE non travaillé') return 'Férié'; if (estTypeMaladie(t)) return 'Maladie'; if (t === 'FORMATION') return 'Formation'; if (t === 'congé sans solde') return 'Congé s.solde'; return ''; };
+    const month = target.getMonth();
+    const firstDay = new Date(target.getFullYear(), month, 1), lastDay = new Date(target.getFullYear(), month+1, 0);
+    const firstMon = new Date(firstDay); firstMon.setDate(firstDay.getDate()-((firstDay.getDay()+6)%7));
+    const weeks = []; let c = new Date(firstMon);
+    while (c <= lastDay) { weeks.push(new Date(c)); c.setDate(c.getDate()+7); }
+    const pad = n => String(n).padStart(2,'0');
+    const jn = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+    const cS = 'padding:5px;border-radius:4px;font-size:10px;vertical-align:top;width:12%;';
+    const tS = 'padding:5px;border-radius:4px;font-size:11px;font-weight:700;color:white;background:#1565C0;text-align:center;vertical-align:middle;width:7%;';
+    let totM = 0;
+    let calH = '<table style="width:100%;border-collapse:separate;border-spacing:3px"><tr>';
+    for (const j of jn) calH += '<td style="text-align:center;font-size:9px;font-weight:700;color:#607D8B;padding:2px 0">' + j + '</td>';
+    calH += '<td style="text-align:center;font-size:9px;font-weight:700;color:#1565C0;padding:2px 0">Total</td></tr>';
+    for (const mon of weeks) {
+      let wMin = 0, baseA = (currentCalSalarie === 'ANTONIO' ? 39 : 35) * 60, aMal = false;
+      let wMinM = 0, baseAM = 0, aMalM = false, aDM = false;
+      calH += '<tr style="height:55px">';
+      for (let d = 0; d < 7; d++) {
+        const dt = new Date(mon); dt.setDate(mon.getDate() + d);
+        const bj = (currentCalSalarie === 'ANTONIO' && dt.getDay() !== 5) ? 8*60 : 7*60;
+        const inM = dt.getMonth() === month;
+        if (inM && d < 5) aDM = true;
+        const key = pad(dt.getDate()) + '/' + pad(dt.getMonth()+1) + '/' + dt.getFullYear();
+        const j = jMap[key];
+        const fW = d >= 5 && estFerieDate(dt);
+        const bg = fW ? '#FFF9C4' : (inM && j ? cT(j.type) : '#F5F5F5');
+        const op = inM ? '1' : '0.4';
+        let inner = '<b style="font-size:12px">' + dt.getDate() + '</b>';
+        if (fW) inner += '<br><span style="color:#546E7A;font-size:9px">🎉 Férié</span>';
+        const isT = j && j.type === 'Jour Travaillé', isS = j && j.type === 'journee solidarité travaillé', isF = j && j.type === 'JOUR FERIE non travaillé';
+        const isA = j && ['CONGE','RTT','ABSENT','ARRET TRAVAIL MALADIE','ARRET MALADIE AVEC SUBROGATION','ARRET MALADIE SANS SUBROGATION','congé sans solde','absences non rémunérées avec retenue sur salaire'].includes(j.type);
+        if (j && estTypeMaladie(j.type)) { aMal = true; if (inM) aMalM = true; }
+        if ((isT || isS) && j.travaille && j.travaille !== '0:00' && j.travaille !== '0:00:00') {
+          inner += '<br><span style="color:#1565C0;font-size:10px">' + j.travaille.replace(':00','') + '</span>';
+          if (isT) { wMin += hhm(j.travaille); if (inM) wMinM += hhm(j.travaille); }
+          if (isS) { const d = hhm(j.travaille) - bj; if (d > 0) { wMin += d; if (inM) wMinM += d; } }
+        } else if (j) { const l = lT(j.type); if (l) inner += '<br><span style="color:#546E7A;font-size:9px">' + l + '</span>'; }
+        if (isF) { wMin += bj; if (inM) { wMinM += bj; baseAM += bj; } }
+        if (isA) baseA -= bj;
+        else if (!j) baseA -= bj;
+        else if (inM && !isF && d < 5) baseAM += bj;
+        calH += '<td style="' + cS + 'background:' + bg + ';opacity:' + op + '">' + inner + '</td>';
+      }
+      const td = new Date(); td.setHours(0,0,0,0);
+      const fW = mon > td;
+      let aD = false;
+      for (let d = 0; d < 5; d++) { const d2 = new Date(mon); d2.setDate(mon.getDate()+d); const k2 = pad(d2.getDate())+'/'+pad(d2.getMonth()+1)+'/'+d2.getFullYear(); const j2 = jMap[k2]; if (j2 && j2.travaille && j2.travaille !== '' && j2.travaille !== '0:00' && j2.travaille !== '0:00:00') { aD = true; break; } }
+      let wTM = wMinM;
+      if (currentCalSalarie !== 'ANTONIO') { const e = wMinM - baseAM; const m = e > 0 ? Math.round(e * 1.25) : 0; wTM = aMalM ? (wMinM + m) : (baseAM + m); }
+      if (fW && !aD) calH += '<td style="' + tS + '">—</td></tr>';
+      else { if (aDM) totM += wTM; calH += '<td style="' + tS + '">' + mh(wTM) + '</td></tr>'; }
+    }
+    calH += '</table><div style="background:#1565C0;color:white;border-radius:8px;padding:12px;text-align:center;margin-top:12px"><div style="font-size:12px;opacity:.8">Total du mois</div><div style="font-size:24px;font-weight:700;margin-top:4px">' + mh(totM) + '</div></div>';
+    const pdfHtml = '<html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;color:#263238;padding:20px;margin:0}h1{color:#1565C0;font-size:18px;margin-bottom:4px}.sub{color:#607D8B;font-size:12px;margin-bottom:16px}</style></head><body><h1>D ECO OUEST — ' + currentCalSalarie + ' — ' + moisNomFr + '</h1><div class="sub">Généré le ' + new Date().toLocaleDateString('fr-FR') + '</div>' + calH + '</body></html>';
+    const encoded = encodeURIComponent(pdfHtml.replace(/\n\s*/g, '').replace(/>\s+</g, '><'));
+    const CHUNK = 1600;
+    const total = Math.ceil(encoded.length / CHUNK);
+    let finalR = null;
+    for (let i = 0; i < total; i++) {
+      const chunk = encoded.substring(i * CHUNK, (i+1) * CHUNK);
+      btn.textContent = '⏳ ' + Math.round((i+1)/total*100) + '%...';
+      const r = await apiGet({ action: 'pdf_mensuel_chunk', salarie: currentCalSalarie, chunk, idx: i, total });
+      if (!r || !r.ok) { showToast('❌ Erreur PDF', 4000); break; }
+      if (i === total - 1) finalR = r;
+    }
+    if (finalR && finalR.base64) {
+      const a = document.createElement('a');
+      a.href = 'data:application/pdf;base64,' + finalR.base64;
+      a.download = 'Calendrier_' + currentCalSalarie + '_' + moisNomFr.replace(/ /g,'_') + '.pdf';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      showToast('✅ PDF téléchargé !', 2000);
+    }
+  } catch(err) { showToast('❌ ' + err.message, 4000); }
+  finally { btn.disabled = false; btn.textContent = '📄 Télécharger en PDF'; }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PDF SOLDE / MENSUEL
+// ═══════════════════════════════════════════════════════════════
+async function telechargerPdfSolde() {
+  const btn = document.getElementById('btn-pdf-solde');
+  btn.disabled = true; btn.textContent = '⏳ Génération...';
+  try {
+    const data = CACHE.solde || await apiGet({ action: 'solde' });
+    if (!data || !data.ok) { showToast('❌ Impossible', 4000); return; }
+    const date = new Date().toLocaleDateString('fr-FR');
+    let salRows = '';
+    for (const s of data.salaries) {
+      const c = s.positif ? '#2E7D32' : '#C62828';
+      const sd = s.solidarite || { found: false };
+      const sl = sd.found ? '<tr><td colspan="2" style="font-size:10px;color:#1565C0">🤝 Solidarité : ' + sd.date + '</td></tr>' : '<tr><td colspan="2" style="font-size:10px;color:#E65100">⚠️ Solidarité non effectuée</td></tr>';
+      salRows += '<div style="background:' + (s.positif ? '#E8F5E9' : '#FFEBEE') + ';border-left:4px solid ' + c + ';border-radius:8px;padding:14px;margin-bottom:12px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:16px;font-weight:700;color:#263238">' + s.nom + '</span><span style="background:' + c + ';color:white;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600">' + s.statut + '</span></div><table style="width:100%;border-collapse:collapse;font-size:11px"><tr><td style="padding:4px 0;color:#607D8B">Net 2026</td><td style="text-align:right;font-weight:600">' + s.net2026 + '</td><td style="padding:4px 8px;color:#607D8B">Report 2025</td><td style="text-align:right;font-weight:600">' + s.report + '</td></tr><tr><td style="padding:4px 0;color:#607D8B">Solde final</td><td style="text-align:right;font-weight:700;color:' + c + ';font-size:14px">' + s.solde + '</td><td style="padding:4px 8px;color:#607D8B">Mois</td><td style="text-align:right;font-weight:600">' + s.mois + '</td></tr>' + sl + '</table></div>';
+    }
+    const pdfHtml = '<html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;color:#263238;padding:20px;margin:0}h1{color:#1565C0;font-size:20px}.sub{color:#607D8B;font-size:12px;margin-bottom:20px}</style></head><body><h1>🏗️ D ECO OUEST — Solde Global</h1><div class="sub">Généré le ' + date + '</div>' + salRows + '</body></html>';
+    const encoded = encodeURIComponent(pdfHtml.replace(/\n\s*/g, '').replace(/>\s+</g, '><'));
+    const CHUNK = 1600;
+    const total = Math.ceil(encoded.length / CHUNK);
+    let finalR = null;
+    for (let i = 0; i < total; i++) {
+      const chunk = encoded.substring(i * CHUNK, (i+1) * CHUNK);
+      btn.textContent = '⏳ ' + Math.round((i+1)/total*100) + '%...';
+      const r = await apiGet({ action: 'pdf_mensuel_chunk', salarie: 'ANATOLE', chunk, idx: i, total });
+      if (!r || !r.ok) { showToast('❌ Erreur PDF', 4000); return; }
+      if (i === total - 1) finalR = r;
+    }
+    if (finalR && finalR.base64) {
+      const a = document.createElement('a');
+      a.href = 'data:application/pdf;base64,' + finalR.base64;
+      a.download = 'Solde_Global_' + date.replace(/\//g,'-') + '.pdf';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      showToast('✅ PDF téléchargé !', 2000);
+    }
+  } catch(err) { showToast('❌ ' + err.message, 4000); }
+  finally { btn.disabled = false; btn.textContent = '📄 Télécharger le rapport Solde en PDF'; }
+}
+
+async function telechargerPdfMensuel() {
+  const btn = document.getElementById('btn-pdf-mensuel');
+  btn.disabled = true; btn.textContent = '⏳ Génération...';
+  try {
+    const now = new Date();
+    const target = new Date(now.getFullYear(), now.getMonth() + currentMensMonthOffset, 1);
+    const moisNom = target.toLocaleDateString('fr-FR', {month:'long', year:'numeric'});
+    const ck = 'mensuel_' + currentMensSalarie + '_' + currentMensMonthOffset;
+    let j = CACHE[ck] ? CACHE[ck].mois : [];
+    if (!j.length) { const d = await apiGet({ action: 'mois', salarie: currentMensSalarie, offset: currentMensMonthOffset }); if (d && d.ok) j = d.mois; }
+    if (!j || !j.length) { showToast('❌ Aucune donnée', 4000); btn.disabled = false; btn.textContent = '📄 Télécharger le mois en PDF'; return; }
+    let rows = '';
+    for (const x of j) rows += '<tr><td>' + x.date + '</td><td>' + (x.jour || '') + '</td><td>' + typeLabelCourt(x.type) + '</td><td>' + (x.travaille || '—') + '</td><td>' + (x.ecart || '—') + '</td></tr>';
+    const pdfHtml = '<html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;padding:20px}h1{color:#1565C0;font-size:16px}table{width:100%;border-collapse:collapse;font-size:11px}th{background:#1565C0;color:white;padding:6px}td{padding:4px;border-bottom:1px solid #E0E0E0;text-align:center}</style></head><body><h1>D ECO OUEST — ' + currentMensSalarie + ' — ' + moisNom + '</h1><p style="font-size:11px;color:#607D8B">Généré le ' + new Date().toLocaleDateString('fr-FR') + '</p><table><tr><th>Date</th><th>Jour</th><th>Type</th><th>Travaillé</th><th>Écart</th></tr>' + rows + '</table></body></html>';
+    const encoded = encodeURIComponent(pdfHtml.replace(/\n\s*/g, '').replace(/>\s+</g, '><'));
+    const CHUNK = 3200;
+    const total = Math.ceil(encoded.length / CHUNK);
+    let finalR = null;
+    for (let i = 0; i < total; i++) {
+      const chunk = encoded.substring(i * CHUNK, (i+1) * CHUNK);
+      btn.textContent = '⏳ ' + Math.round((i+1)/total*100) + '%...';
+      const r = await apiGet({ action: 'pdf_mensuel_chunk', salarie: currentMensSalarie, chunk, idx: i, total });
+      if (!r || !r.ok) { showToast('❌ Erreur', 4000); break; }
+      if (i === total - 1) finalR = r;
+    }
+    if (finalR && finalR.base64) {
+      const a = document.createElement('a');
+      a.href = 'data:application/pdf;base64,' + finalR.base64;
+      a.download = 'Mensuel_' + currentMensSalarie + '_' + moisNom.replace(/ /g,'_') + '.pdf';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      showToast('✅ PDF téléchargé !', 2000);
+    }
+  } catch(err) { showToast('❌ ' + err.message, 4000); }
+  finally { btn.disabled = false; btn.textContent = '📄 Télécharger le mois en PDF'; }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CAPTURES
+// ═══════════════════════════════════════════════════════════════
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+function downloadImage(u, f) {
+  if (IS_IOS) {
+    const w = window.open();
+    if (w) w.document.write('<html><head><title>' + f + '</title></head><body style="margin:0;background:#111"><img src="' + u + '" style="width:100%"><p style="text-align:center;color:#fff;font-family:sans-serif;padding:10px">Appui long pour enregistrer</p></body></html>');
+    else window.location.href = u;
+  } else {
+    const a = document.createElement('a');
+    a.href = u; a.download = f;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  }
+}
+async function captureElementComplet(src, bg, wMax) {
+  bg = bg || '#F5F7FA';
+  const cl = src.cloneNode(true);
+  cl.style.overflow = 'visible'; cl.style.maxWidth = 'none';
+  cl.style.width = wMax ? wMax + 'px' : 'max-content';
+  cl.querySelectorAll('button').forEach(b => { const p = b.parentElement; b.remove(); if (p && p !== cl && !p.textContent.trim() && p.children.length === 0) p.remove(); });
+  cl.querySelectorAll('*').forEach(n => { n.style.overflow = 'visible'; n.style.overflowX = 'visible'; if (!wMax) n.style.maxWidth = 'none'; });
+  const h = document.createElement('div');
+  h.style.cssText = 'position:fixed;left:-20000px;top:0;background:' + bg + ';padding:16px;z-index:-1;' + (wMax ? 'width:' + (wMax + 32) + 'px' : 'width:max-content');
+  h.appendChild(cl); document.body.appendChild(h);
+  try {
+    const w = Math.max(h.scrollWidth, h.offsetWidth), ht = Math.max(h.scrollHeight, h.offsetHeight);
+    const LIM = 15000; let s = 2;
+    if (ht * s > LIM) s = Math.max(1, LIM / ht);
+    return await html2canvas(h, { scale: s, useCORS: true, backgroundColor: bg, logging: false, width: w, height: ht, windowWidth: w + 200, windowHeight: ht + 200 });
+  } finally { h.remove(); }
+}
+function fitToA4(src, m, or) {
+  m = m || 50;
+  const p = or !== 'landscape';
+  const W = p ? 1240 : 1754, H = p ? 1754 : 1240;
+  const o = document.createElement('canvas'); o.width = W; o.height = H;
+  const c = o.getContext('2d');
+  c.fillStyle = '#F5F7FA'; c.fillRect(0, 0, W, H);
+  const mW = W - m * 2, mH = H - m * 2;
+  const s = Math.min(mW / src.width, mH / src.height);
+  const w = src.width * s, h = src.height * s;
+  c.drawImage(src, 0, 0, src.width, src.height, (W - w) / 2, (H - h) / 2, w, h);
+  return o;
+}
+async function captureSolde() {
+  const b = document.getElementById('btn-capture-solde'); b.disabled = true; b.textContent = '⏳...';
+  try { const c = await captureElementComplet(document.getElementById('solde-content'), null, 760); const a = fitToA4(c); downloadImage(a.toDataURL('image/jpeg', 0.92), 'Solde_' + new Date().toLocaleDateString('fr-FR').replace(/\//g,'-') + '.jpg'); showToast('✅ Image téléchargée !', 2000); } catch(e) { showToast('❌ ' + e.message, 4000); } finally { b.disabled = false; b.textContent = '📸 Capturer Solde en image'; }
+}
+async function captureSemaine() {
+  const b = document.getElementById('btn-capture-semaine'); b.disabled = true; b.textContent = '⏳...';
+  try { const l = document.getElementById('week-label-main')?.textContent || 'Semaine'; const c = await captureElementComplet(document.getElementById('semaine-content')); const a = fitToA4(c); downloadImage(a.toDataURL('image/jpeg', 0.92), 'Semaine_' + currentSalarie + '_' + l.replace(/\s/g,'_') + '.jpg'); showToast('✅ Image téléchargée !', 2000); } catch(e) { showToast('❌ ' + e.message, 4000); } finally { b.disabled = false; b.textContent = '📸 Capturer la semaine en image'; }
+}
+async function captureMensuel() {
+  const b = document.getElementById('btn-capture-mensuel'); b.disabled = true; b.textContent = '⏳...';
+  const el = document.getElementById('mensuel-content');
+  try { const m = document.getElementById('mens-month-label')?.textContent || 'Mois'; el.classList.add('capture-hide-daily'); const c = await captureElementComplet(el, null, 900); downloadImage(c.toDataURL('image/jpeg', 0.95), 'Mensuel_' + currentMensSalarie + '_' + m.replace(/\s/g,'_') + '.jpg'); showToast('✅ Image téléchargée !', 2000); } catch(e) { showToast('❌ ' + e.message, 4000); } finally { el.classList.remove('capture-hide-daily'); b.disabled = false; b.textContent = '📸 Capturer le mois en image'; }
+}
+async function captureRecap() {
+  const b = document.getElementById('btn-capture-recap'); b.disabled = true; b.textContent = '⏳...';
+  try { const c = await captureElementComplet(document.getElementById('recap-content'), null, 900); const a = fitToA4(c); downloadImage(a.toDataURL('image/jpeg', 0.92), 'Recap_' + currentRecapSal + '_' + new Date().toLocaleDateString('fr-FR').replace(/\//g,'-') + '.jpg'); showToast('✅ Image téléchargée !', 2000); } catch(e) { showToast('❌ ' + e.message, 4000); } finally { b.disabled = false; b.textContent = '📸 Capturer le récap en image'; }
+}
+async function captureCalendrier() {
+  const b = document.getElementById('btn-capture-calendrier'); b.disabled = true; b.textContent = '⏳...';
+  try { const m = document.getElementById('cal-month-label')?.textContent || 'Mois'; const c = await captureElementComplet(document.getElementById('calendrier-content')); const a = fitToA4(c, 50, 'landscape'); downloadImage(a.toDataURL('image/jpeg', 0.92), 'Calendrier_' + currentCalSalarie + '_' + m.replace(/\s/g,'_') + '.jpg'); showToast('✅ Image téléchargée !', 2000); } catch(e) { showToast('❌ ' + e.message, 4000); } finally { b.disabled = false; b.textContent = '📸 Capturer le calendrier en image'; }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CALCULATEUR CONGÉS
+// ═══════════════════════════════════════════════════════════════
+function calculerConges() {
+  const sal = document.getElementById('cc-salarie').value;
+  const ds = document.getElementById('cc-debut').value, fs = document.getElementById('cc-fin').value;
+  const el = document.getElementById('cc-resultat');
+  if (!ds || !fs) { el.innerHTML = '<div style="color:var(--red);font-size:12px">Saisir les dates</div>'; return; }
+  const debut = new Date(ds + 'T00:00:00'), fin = new Date(fs + 'T00:00:00');
+  if (fin < debut) { el.innerHTML = '<div style="color:var(--red);font-size:12px">Fin après début</div>'; return; }
+  let jO = 0, jF = 0, jOuv = 0; const fL = [];
+  const d = new Date(debut);
+  while (d <= fin) { const w = d.getDay(); if (w !== 0) jOuv++; if (w >= 1 && w <= 5) { if (estFerieDate(d)) { jF++; fL.push(d.toLocaleDateString('fr-FR', { weekday:'short', day:'2-digit', month:'2-digit' })); } else jO++; } d.setDate(d.getDate() + 1); }
+  let hD = 0; const d2 = new Date(debut);
+  while (d2 <= fin) { const w = d2.getDay(); if (w >= 1 && w <= 5 && !estFerieDate(d2)) hD += (sal === 'ANTONIO' && w !== 5) ? 8*60 : 7*60; d2.setDate(d2.getDate() + 1); }
+  el.innerHTML = '<div style="background:#F8FBFF;border-radius:10px;padding:14px 16px"><div style="display:flex;justify-content:space-between"><span style="font-size:13px;color:var(--text2)">Jours ouvrables (lun-sam)</span><span style="font-weight:700">' + jOuv + ' j.</span></div><div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:13px;color:var(--blue)">↓ Jours ouvrés déduits</span><span style="font-size:18px;font-weight:700;color:var(--blue)">' + jO + ' j.</span></div>' + (jF > 0 ? '<div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:12px;color:var(--amber)">🎉 Fériés : ' + fL.join(', ') + '</span><span style="font-weight:700;color:var(--amber)">' + jF + ' j.</span></div>' : '') + '<div style="border-top:1px dashed #B0BEC5;margin:10px 0"></div><div style="display:flex;justify-content:space-between;align-items:center;background:var(--blue);border-radius:8px;padding:10px 12px"><span style="font-size:12px;color:rgba(255,255,255,.85)">Heures à déduire</span><span style="font-size:20px;font-weight:700;color:white">' + minsToStr2(hD) + '</span></div></div>';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════════
+async function saveConfig() {
+  const u = document.getElementById('api-url').value.trim();
+  if (!u) { showToast('❌ URL vide'); return; }
+  API_URL = u; showToast('Test de connexion...');
+  const r = await apiGet({ action: 'ping' });
+  if (r && r.ok) { localStorage.setItem('deo_api_url', u); showToast('✅ Connecté !'); setStatus('Connecté'); loadSolde(); }
+  else showToast('❌ Échec');
+}
+function reinitialiserConfig() { localStorage.removeItem('deo_api_url'); API_URL = API_URL_DEFAUT; document.getElementById('api-url').value = API_URL; showToast('↺ Restauré'); loadSolde(); }
+
+// ═══════════════════════════════════════════════════════════════
+// REFRESH
+// ═══════════════════════════════════════════════════════════════
+function refreshAll() {
+  const a = document.querySelector('.page.active').id;
+  if (a === 'page-solde') loadSolde();
+  if (a === 'page-semaine') loadSemaine(currentSalarie);
+  if (a === 'page-mensuel') loadMensuel();
+  if (a === 'page-recap') loadRecap(currentRecapSal);
+  if (a === 'page-calendrier') loadCalendrier();
+  showToast('🔄 Actualisation...');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+window.addEventListener('load', async () => {
+  setStatus('Connexion...');
+  await loadSolde();
+});
+
+</script>
+</body>
+</html>═══════════════════════════
+    
