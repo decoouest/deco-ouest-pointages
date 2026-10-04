@@ -1395,7 +1395,8 @@ function renderMensuel(jours, sal, moisNom, semainesCompletes, recupGlobal, ijss
     semaines[k].sort((a,b) => pd(a.date) - pd(b.date));
   }
 
-  let tTrav = 0, tEcart = 0, tM25 = 0, tAssim = 0, tM50 = 0, tBase = 0, dedDA = 0;
+    let tTrav = 0, tEcart = 0, tM25 = 0, tAssim = 0, tM50 = 0, tBase = 0, dedDA = 0;
+  let detteRecupMin = 0; // heures manquantes en mode "Compteur" → dette à rattraper
   let nRtt = 0, nConge = 0, nMal = 0, nMalAvecSub = 0, nMalSansSub = 0, nAbs = 0, nAbsNR = 0, nCSS = 0, nFer = 0;
   const congeDates = [];
   let rows = '';
@@ -1426,12 +1427,21 @@ function renderMensuel(jours, sal, moisNom, semainesCompletes, recupGlobal, ijss
       else if (isF) cls = 'ferie';
 
       if (duMois) {
-        if (isT) {
+                if (isT) {
           if (j.travaille) tTrav += parseDur(j.travaille);
           if (j.ecart) tEcart += parseDur(j.ecart);
-          if (j.remarque && j.remarque.startsWith('[[RETENUE-DA]]') && j.ecart) {
+          // Départ anticipé : les heures manquantes (écart négatif) sont traitées
+          // soit en RETENUE sur salaire, soit en DETTE DE RÉCUPÉRATION
+          const modeDA = (j.remarque && j.remarque.startsWith('[[RETENUE-DA]]')) ? 'retenue' : 'compteur';
+          if (j.ecart) {
             const e = parseDur(j.ecart);
-            if (e < 0) dedDA += -e;
+            if (e < 0) {
+              if (modeDA === 'retenue') {
+                dedDA += -e;         // ← déduit du salaire employeur
+              } else {
+                detteRecupMin += -e; // ← augmente la dette de récupération
+              }
+            }
           }
         }
         if (t === 'ABSENT' || t === 'absences non rémunérées avec retenue sur salaire') { nAbs++; nAbsNR++; }
