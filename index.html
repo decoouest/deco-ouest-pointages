@@ -1452,17 +1452,44 @@ async function telechargerPdfMensuel() {
   const btn = document.getElementById('btn-pdf-mensuel');
   btn.disabled = true; btn.textContent = '⏳ Génération...';
   try {
+    const el = document.getElementById('mensuel-content');
+    if (!el || !el.innerHTML.trim()) { showToast('❌ Aucune donnée à exporter', 4000); return; }
+
     const now = new Date();
     const target = new Date(now.getFullYear(), now.getMonth() + currentMensMonthOffset, 1);
     const moisNom = target.toLocaleDateString('fr-FR', {month:'long', year:'numeric'});
-    const ck = 'mensuel_' + currentMensSalarie + '_' + currentMensMonthOffset;
-    let j = CACHE[ck] ? CACHE[ck].mois : [];
-    if (!j.length) { const d = await apiGet({ action: 'mois', salarie: currentMensSalarie, offset: currentMensMonthOffset }); if (d && d.ok) j = d.mois; }
-    if (!j || !j.length) { showToast('❌ Aucune donnée', 4000); btn.disabled = false; btn.textContent = '📄 Télécharger le mois en PDF'; return; }
-    let rows = '';
-    for (const x of j) rows += '<tr><td>' + x.date + '</td><td>' + (x.jour || '') + '</td><td>' + typeLabelCourt(x.type) + '</td><td>' + (x.travaille || '—') + '</td><td>' + (x.ecart || '—') + '</td></tr>';
-    const pdfHtml = '<html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;padding:20px}h1{color:#1565C0;font-size:16px}table{width:100%;border-collapse:collapse;font-size:11px}th{background:#1565C0;color:white;padding:6px}td{padding:4px;border-bottom:1px solid #E0E0E0;text-align:center}</style></head><body><h1>D ECO OUEST — ' + currentMensSalarie + ' — ' + moisNom + '</h1><p style="font-size:11px;color:#607D8B">Généré le ' + new Date().toLocaleDateString('fr-FR') + '</p><table><tr><th>Date</th><th>Jour</th><th>Type</th><th>Travaillé</th><th>Écart</th></tr>' + rows + '</table></body></html>';
-    const encoded = encodeURIComponent(pdfHtml.replace(/\n\s*/g, '').replace(/>\s+</g, '><'));
+    const moisNomFr = moisNom.charAt(0).toUpperCase() + moisNom.slice(1);
+
+    // Cloner le contenu affiché à l'écran (identique à la capture)
+    const clone = el.cloneNode(true);
+    // Retirer les boutons (Audit 🔎) qui n'ont pas de sens dans un PDF figé
+    clone.querySelectorAll('button').forEach(b => b.remove());
+    // Fermer les panneaux d'audit ouverts pour ne pas surcharger (optionnel)
+    // clone.querySelectorAll('.audit-panel.open').forEach(p => p.classList.remove('open'));
+
+    // Récupérer tout le CSS du document (variables :root incluses)
+    const cssContent = Array.from(document.querySelectorAll('style'))
+      .map(s => s.textContent).join('\n');
+
+    // Construire le HTML complet
+    const pdfHtml = '<!DOCTYPE html><html><head><meta charset="utf-8">'
+      + '<style>' + cssContent + '</style>'
+      + '<style>'
+      + 'body{margin:20px;background:#F5F7FA;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#263238}'
+      + '.card{page-break-inside:avoid;break-inside:avoid}'
+      + '.mens-table{page-break-inside:auto}'
+      + '.mens-table tr{page-break-inside:avoid}'
+      + '.tooltip-box{display:none !important}'
+      + 'button{display:none !important}'
+      + '</style>'
+      + '</head><body>'
+      + '<h1 style="color:#1565C0;font-size:20px;margin:0 0 4px">D ECO OUEST — ' + currentMensSalarie + '</h1>'
+      + '<div style="color:#607D8B;font-size:12px;margin-bottom:16px">' + moisNomFr + ' · Généré le ' + new Date().toLocaleDateString('fr-FR') + '</div>'
+      + clone.outerHTML
+      + '</body></html>';
+
+    // Encoder et envoyer par chunks
+    const encoded = encodeURIComponent(pdfHtml);
     const CHUNK = 3200;
     const total = Math.ceil(encoded.length / CHUNK);
     let finalR = null;
@@ -1470,7 +1497,7 @@ async function telechargerPdfMensuel() {
       const chunk = encoded.substring(i * CHUNK, (i+1) * CHUNK);
       btn.textContent = '⏳ ' + Math.round((i+1)/total*100) + '%...';
       const r = await apiGet({ action: 'pdf_mensuel_chunk', salarie: currentMensSalarie, chunk, idx: i, total });
-      if (!r || !r.ok) { showToast('❌ Erreur', 4000); break; }
+      if (!r || !r.ok) { showToast('❌ Erreur chunk ' + i, 4000); break; }
       if (i === total - 1) finalR = r;
     }
     if (finalR && finalR.base64) {
@@ -1482,9 +1509,7 @@ async function telechargerPdfMensuel() {
     }
   } catch(err) { showToast('❌ ' + err.message, 4000); }
   finally { btn.disabled = false; btn.textContent = '📄 Télécharger le mois en PDF'; }
-}
-
-// ═══════════════════════════════════════════════════════════════
+} ═══════════════════════════════════════════════════════════════
 // CAPTURES
 // ═══════════════════════════════════════════════════════════════
 const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
