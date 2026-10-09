@@ -162,6 +162,19 @@ main{padding:16px;max-width:600px;margin:0 auto}
 .cal-cell.ferie{background:#FFF9C4}
 .cal-legend{display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:var(--text2)}
 .cal-legend span{display:flex;align-items:center;gap:4px}
+/* ⭐ Infobulle remarque custom (survol desktop) */
+.rq-hint{position:relative;display:inline-block;cursor:pointer}
+.rq-hint::after{
+  content:attr(data-rq);
+  display:none;position:absolute;left:50%;transform:translateX(-50%);
+  bottom:calc(100% + 8px);background:#263238;color:#fff;
+  padding:8px 12px;border-radius:8px;font-size:12px;font-weight:400;
+  white-space:pre-wrap;width:max-content;max-width:240px;
+  z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.3);
+  line-height:1.4;text-align:left;pointer-events:none;
+}
+.rq-hint:hover::after{display:block}
+.rq-hint.rq-down::after{bottom:auto;top:calc(100% + 6px)}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
 </head>
@@ -355,74 +368,13 @@ window.addEventListener('DOMContentLoaded',()=>{if(sessionStorage.getItem('deo_a
     <button class="btn-config" onclick="calculerConges()">🧮 Calculer</button>
     <div id="cc-resultat" style="margin-top:12px"></div>
   </div>
-  <div class="card" style="margin-top:12px;border-left:4px solid var(--amber)">
-    <div class="card-title" style="color:var(--amber)">💶 Simulateur de salaire (estimation)</div>
-    <div style="font-size:12px;color:var(--text2);margin-bottom:10px">
-      Estime le salaire net à partir d'un taux horaire. <strong>⚠️ Ce n'est pas un
-      vrai bulletin de paie</strong> : le calcul réel comporte des dizaines de lignes de
-      cotisations (retraite AGIRC-ARRCO par tranches, prévoyance, taux AT/MP propres à
-      l'entreprise, etc.) que seul un logiciel de paie peut établir précisément. Ici, on
-      applique un taux de charges salariales moyen, modifiable si tu connais le taux exact
-      appliqué sur les bulletins.
-    </div>
-    <div style="display:flex;gap:8px">
-      <div class="form-group" style="flex:1">
-        <label class="form-label">Taux horaire brut (€)</label>
-        <input class="config-input" type="number" step="0.01" id="sim-taux" placeholder="ex: 20.00">
-      </div>
-      <div class="form-group" style="flex:1">
-        <label class="form-label">Contrat</label>
-        <select class="config-input" id="sim-contrat" onchange="toggleSimHeures()">
-          <option value="35">35h/semaine</option>
-          <option value="39">39h/semaine (17,33h maj. 25% incl.)</option>
-          <option value="manuel">Heures manuelles</option>
-        </select>
-      </div>
-    </div>
-    <div class="form-group" id="sim-heures-group" style="display:none">
-      <label class="form-label">Heures payées ce mois</label>
-      <input class="config-input" type="text" id="sim-heures" placeholder="ex: 151:40 ou 151,67">
-    </div>
-    <div style="font-size:11px;color:var(--text2);font-weight:600;margin:10px 0 4px">Cotisations salariales (taux nationaux, fixes)</div>
-    <div style="background:var(--gray-l);border-radius:8px;padding:8px 10px;font-size:11px;color:var(--text2);line-height:1.9">
-      Vieillesse (plafonnée + déplafonnée) : <strong>7,30 %</strong><br>
-      Retraite complémentaire Agirc-Arrco T1 : <strong>3,15 %</strong><br>
-      Contribution d'équilibre général (CEG) T1 : <strong>0,86 %</strong><br>
-      Prévoyance obligatoire PRO BTP (RNPO) : <strong>0,87 %</strong><br>
-      CSG/CRDS : <strong>9,70 %</strong> sur 98,25 % du brut<br>
-      Assurance chômage : <strong>0 %</strong> &nbsp;·&nbsp; Assurance maladie : <strong>0 %</strong>
-    </div>
-    <div style="font-size:11px;color:var(--text2);font-weight:600;margin:10px 0 4px">Cotisation variable selon l'entreprise — à ajuster</div>
-    <div class="form-group">
-      <label class="form-label">Mutuelle (€/mois, forfait)</label>
-      <input class="config-input" type="number" step="0.01" id="sim-mutuelle" placeholder="ex: 45.00">
-    </div>
-    <div class="config-hint" style="margin:-6px 0 10px">La mutuelle est en général un forfait fixe (pas un %) et varie selon le contrat d'entreprise — vérifie ce montant sur un vrai bulletin.</div>
-    <div style="display:flex;gap:8px">
-      <div class="form-group" style="flex:1">
-        <label class="form-label">Indemnité de panier (€/jour)</label>
-        <input class="config-input" type="number" step="0.01" id="sim-panier" placeholder="ex: 13.00">
-      </div>
-      <div class="form-group" style="flex:1">
-        <label class="form-label">Jours travaillés (panier)</label>
-        <input class="config-input" type="number" id="sim-panier-jours" placeholder="ex: 22">
-      </div>
-    </div>
-    <div class="config-hint" style="margin:-6px 0 10px">Le panier est en principe exonéré de cotisations et d'impôt s'il respecte le plafond URSSAF, et vient s'ajouter au net. Le montant dépend de ta convention régionale (ex. Île-de-France) — vérifie-le sur un bulletin réel.</div>
-    <button class="btn-config" onclick="calculerSimulationSalaire()">💶 Estimer</button>
-    <div id="sim-resultat" style="margin-top:12px"></div>
-    <div id="sim-export-btns" style="display:none;gap:8px;margin-top:10px">
-      <button class="btn-config" style="flex:1;background:var(--green-l);color:var(--green)" id="btn-capture-sim" onclick="captureSimulateur()">📸 Image</button>
-      <button class="btn-config" style="flex:1;background:var(--blue-l);color:var(--blue)" id="btn-pdf-sim" onclick="telechargerPdfSimulateur()">📄 PDF</button>
-    </div>
-  </div>
 </div>
 </main>
 
 <div class="toast" id="toast"></div>
 
 <!-- ═══════════════════════════════════════════════════════════════
-     FIN PARTIE 1/3
+     FIN PARTIE 1/3 — Le <script> principal commence en PARTIE 2
      ═══════════════════════════════════════════════════════════════ -->
   <script>
 
@@ -433,12 +385,11 @@ const API_URL_DEFAUT = 'https://script.google.com/macros/s/AKfycbwyhfe8rpXzUYW7y
 let API_URL = localStorage.getItem('deo_api_url') || API_URL_DEFAUT;
 const CACHE = {};
 let currentSalarie = 'ANATOLE', currentRecapSal = 'ANATOLE', currentSaisieRow = null;
-let selectedType = null, selectedDAMode = null;   // ⭐ null par défaut = aucune option
-const DA_MARKER = '[[RETENUE-DA]]';               // mode Retenue salaire
-const COMPTEUR_MARKER = '[[COMPTEUR-DA]]';        // mode Compteur récup (dette)
+let selectedType = null, selectedDAMode = null;
+const DA_MARKER = '[[RETENUE-DA]]';
+const COMPTEUR_MARKER = '[[COMPTEUR-DA]]';
 let currentWeekOffset = 0, currentMensSalarie = 'ANATOLE', currentMensMonthOffset = 0;
 let currentCalSalarie = 'ANATOLE', currentCalMonthOffset = 0, calLoadToken = 0;
-// Jetons anti-réponse tardive : empêchent un ancien chargement d'écraser l'écran courant.
 let semaineLoadToken = 0, mensuelLoadToken = 0, recapLoadToken = 0;
 
 document.getElementById('api-url').value = API_URL;
@@ -503,6 +454,26 @@ function minsToStr2(m) { const n = m<0, a = Math.abs(m); return (n?'-':'') + Mat
 function strToMin(s) { if (!s) return 0; s = String(s).trim(); const n = s.startsWith('-'); const c = s.replace('-',''); const p = c.split(':'); const t = (parseInt(p[0])||0)*60 + (parseInt(p[1])||0); return n ? -t : t; }
 function cleanTime(s) { if (!s) return s; const p = s.split(':'); return p.length===3 ? p[0]+':'+p[1] : s; }
 function traduireMois(s) { const tr = {'January':'Janvier','February':'Février','March':'Mars','April':'Avril','May':'Mai','June':'Juin','July':'Juillet','August':'Août','September':'Septembre','October':'Octobre','November':'Novembre','December':'Décembre'}; for (const [en, fr] of Object.entries(tr)) if (s.includes(en)) return s.replace(en, fr); return s; }
+
+// ⭐ Nettoie une remarque des marqueurs internes
+function cleanRemarque(raw) {
+  if (!raw) return '';
+  return String(raw)
+    .replace(new RegExp('^' + DA_MARKER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), '')
+    .replace(new RegExp('^' + COMPTEUR_MARKER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), '')
+    .trim();
+}
+// ⭐ Génère le HTML du picto 💬 avec infobulle et clic (mobile)
+function buildRemarqueBadge(raw, date, style) {
+  const cleanRq = cleanRemarque(raw);
+  if (!cleanRq) return '';
+  const htmlSafe = cleanRq.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  const jsSafe = cleanRq.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
+  const extraStyle = style ? ';' + style : '';
+  return '<span class="rq-hint" data-rq="' + htmlSafe + '"'
+    + ' style="display:inline-block;vertical-align:middle;cursor:pointer' + extraStyle + '"'
+    + ' onclick="event.stopPropagation(); afficherRemarque(\'' + date + '\', \'' + jsSafe + '\')">💬</span>';
+}
 
 // ═══════════════════════════════════════════════════════════════
 // MATRICE NATURE
@@ -627,7 +598,6 @@ async function calculerDetteDepartAnticipe(salarie, offset) {
     if (!data || !data.mois) return 0;
     let dette = 0;
     for (const j of data.mois) {
-      // ⭐ Ne compte QUE si marqueur explicite COMPTEUR
       if (j.ecart && typeof j.ecart === 'string' && j.ecart.startsWith('-') && j.remarque && j.remarque.startsWith(COMPTEUR_MARKER)) {
         const c = j.ecart.replace('-', '');
         const p = c.split(':');
@@ -768,10 +738,9 @@ function renderSemaine(jours, sal = currentSalarie) {
   for (const j of jours) {
     const t = j.type || '';
     const isT = t === 'Jour Travaillé' || t === 'journee solidarité travaillé';
-    // ⭐ Pictos uniquement si marqueur explicite
     const isRetenue = isT && j.remarque && j.remarque.startsWith(DA_MARKER) && j.ecart && j.ecart.startsWith('-');
     const isCompteur = isT && j.remarque && j.remarque.startsWith(COMPTEUR_MARKER) && j.ecart && j.ecart.startsWith('-');
-    const cR = (j.remarque || '').replace(new RegExp('^' + DA_MARKER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), '').replace(new RegExp('^' + COMPTEUR_MARKER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), '').trim();
+    const rqBadge = buildRemarqueBadge(j.remarque, j.date);
     html += '<div class="jour-row ' + typeToClass(t) + ' ' + (j.isToday ? 'today' : '') + '" onclick="openSaisie(' + JSON.stringify(j).replace(/"/g,'&quot;') + ')">'
       + (j.isToday ? '<span class="today-badge">AUJOURD\'HUI</span>' : '')
       + '<div class="jour-date">' + j.date.substring(0,5) + '</div>'
@@ -781,7 +750,7 @@ function renderSemaine(jours, sal = currentSalarie) {
       + (isT && j.ecart && j.ecart !== '0:00' ? '<div class="jour-ecart ' + (j.ecart.startsWith('-')?'neg':'pos') + '">' + cleanTime(j.ecart) + '</div>' : '')
       + (isRetenue ? '<div style="font-size:12px;color:var(--red);margin-left:4px" title="Départ anticipé — retenue salaire">💸</div>' : '')
       + (isCompteur ? '<div style="font-size:12px;color:var(--amber);margin-left:4px" title="Départ anticipé — dette récup">⏳</div>' : '')
-      + (cR ? '<div style="font-size:13px;color:var(--amber);margin-left:6px;cursor:pointer" onclick="event.stopPropagation(); afficherRemarque(\'' + j.date + '\', \'' + cR.replace(/'/g, "\\'").replace(/\n/g, ' ') + '\')">💬</div>' : '')
+      + (rqBadge ? '<div style="font-size:13px;margin-left:6px">' + rqBadge + '</div>' : '')
       + '</div>';
   }
   if (nJ > 0) {
@@ -802,7 +771,7 @@ function afficherRemarque(date, texte) {
     m.onclick = e => { if (e.target === m) m.style.display = 'none'; };
     document.body.appendChild(m);
   }
-  const clean = texte.replace(new RegExp('^' + DA_MARKER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), '').replace(new RegExp('^' + COMPTEUR_MARKER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), '');
+  const clean = cleanRemarque(texte);
   m.innerHTML = '<div style="background:white;border-radius:14px;padding:20px;max-width:320px;width:100%"><div style="display:flex;justify-content:space-between;margin-bottom:10px"><div style="font-size:13px;font-weight:700;color:var(--blue)">💬 Remarque — ' + date + '</div><button onclick="document.getElementById(\'remarque-modal\').style.display=\'none\'" style="background:none;border:none;font-size:18px;color:#999;cursor:pointer">✕</button></div><div style="font-size:14px;color:#263238;line-height:1.5;white-space:pre-wrap">' + clean + '</div></div>';
   m.style.display = 'flex';
 }
@@ -811,20 +780,19 @@ function openSaisie(jour) {
   if (jour.jour === 'sam' || jour.jour === 'dim') return;
   currentSaisieRow = jour;
   selectedType = null;
-  selectedDAMode = null;  // ⭐ Aucune option par défaut
+  selectedDAMode = null;
   document.getElementById('saisie-date-label').textContent = jour.date + ' · ' + jour.jour;
   document.getElementById('saisie-sal-label').textContent = currentSalarie;
   document.querySelectorAll('.type-btn:not(.da-btn)').forEach(b => b.classList.remove('selected'));
   if (jour.type) { selectedType = jour.type; document.querySelectorAll('.type-btn:not(.da-btn)').forEach(b => { if (b.textContent.includes(jour.type)) b.classList.add('selected'); }); }
   document.getElementById('f-fin').value = (jour.fin && jour.fin !== '00:00' && jour.fin !== '') ? jour.fin : ((currentSalarie === 'ANTONIO' && jour.jour !== 'ven') ? '17:00' : '16:00');
   document.getElementById('f-arrivee').value = (jour.arrivee && jour.arrivee !== '00:00' && jour.arrivee !== '') ? jour.arrivee : '08:00';
-  // ⭐ Détection des marqueurs
   const raw = jour.remarque || '';
   const hasR = raw.startsWith(DA_MARKER);
   const hasC = raw.startsWith(COMPTEUR_MARKER);
   selectedDAMode = hasR ? 'retenue' : (hasC ? 'compteur' : null);
   document.querySelectorAll('.da-btn').forEach(b => b.classList.toggle('selected', b.dataset.mode === selectedDAMode));
-  document.getElementById('f-remarque').value = hasR ? raw.slice(DA_MARKER.length) : (hasC ? raw.slice(COMPTEUR_MARKER.length) : raw);
+  document.getElementById('f-remarque').value = cleanRemarque(raw);
   const isT = jour.type === 'Jour Travaillé' || jour.type === 'journee solidarité travaillé';
   document.getElementById('heures-form').style.display = isT ? 'block' : 'none';
   document.getElementById('da-form').style.display = isT ? 'block' : 'none';
@@ -843,15 +811,8 @@ function selectType(type) {
   document.getElementById('btn-save').disabled = false;
 }
 function selectDAMode(mode, btn) {
-  // ⭐ Si on re-clique sur le même bouton → désélection (retour à "aucun")
-  if (selectedDAMode === mode) {
-    selectedDAMode = null;
-    btn.classList.remove('selected');
-  } else {
-    selectedDAMode = mode;
-    document.querySelectorAll('.da-btn').forEach(b => b.classList.remove('selected'));
-    btn.classList.add('selected');
-  }
+  if (selectedDAMode === mode) { selectedDAMode = null; btn.classList.remove('selected'); }
+  else { selectedDAMode = mode; document.querySelectorAll('.da-btn').forEach(b => b.classList.remove('selected')); btn.classList.add('selected'); }
 }
 
 async function sauvegarder() {
@@ -860,9 +821,7 @@ async function sauvegarder() {
   try {
     let rq = document.getElementById('f-remarque').value || '';
     const isT = selectedType === 'Jour Travaillé' || selectedType === 'journee solidarité travaillé';
-    // Nettoyage des 2 marqueurs
-    rq = rq.replace(new RegExp('^' + DA_MARKER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), '').replace(new RegExp('^' + COMPTEUR_MARKER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), '');
-    // Application du marqueur choisi (si l'un est actif)
+    rq = cleanRemarque(rq);
     if (isT && selectedDAMode === 'retenue') rq = DA_MARKER + rq;
     if (isT && selectedDAMode === 'compteur') rq = COMPTEUR_MARKER + rq;
     const fin = isT ? document.getElementById('f-fin').value : '';
@@ -888,7 +847,8 @@ async function sauvegarder() {
 
 // ═══════════════════════════════════════════════════════════════
 // FIN PARTIE 2/3 — Le <script> reste ouvert
-// ════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
+    
 // ═══════════════════════════════════════════════════════════════
 // MENSUEL
 // ═══════════════════════════════════════════════════════════════
@@ -974,7 +934,6 @@ function renderMensuel(jours, sal, moisNom, semainesCompletes, recupGlobal, ijss
         if (isT) {
           if (j.travaille) tTrav += parseDur(j.travaille);
           if (j.ecart) tEcart += parseDur(j.ecart);
-          // ⭐ Départ anticipé : SEULEMENT si marqueur explicite
           if (j.ecart && j.remarque) {
             const e = parseDur(j.ecart);
             if (e < 0) {
@@ -1019,13 +978,15 @@ function renderMensuel(jours, sal, moisNom, semainesCompletes, recupGlobal, ijss
       const eC = (isT && j.ecart && j.ecart !== '0:00') ? (j.ecart.startsWith('-') ? ' ecart-neg' : ' ecart-pos') : '';
 
       if (duMois) {
-        // ⭐ Picto uniquement si marqueur explicite
+        // ⭐ Picto départ anticipé (si marqueur explicite)
         let daTag = '';
         if (isT && j.remarque && j.ecart && j.ecart.startsWith('-')) {
           if (j.remarque.startsWith(DA_MARKER)) daTag = ' <span title="Départ anticipé — retenue salaire" style="font-size:10px">💸</span>';
           else if (j.remarque.startsWith(COMPTEUR_MARKER)) daTag = ' <span title="Départ anticipé — dette récup" style="font-size:10px">⏳</span>';
         }
-        rows += '<tr class="' + cls + '"><td><strong>' + dd + '/' + mm + '</strong></td><td>' + jc + '</td><td style="font-size:9px">' + (buildTooltip(t) || typeLabelCourt(t)) + daTag + '</td><td class="mens-trav-col">' + tS + '</td><td class="mens-ecart-col' + eC + '">' + eS + '</td>' + (sal !== 'ANTONIO' ? '<td style="color:#B0BEC5">—</td>' : '') + '<td></td></tr>';
+        // ⭐ Picto remarque 💬 + infobulle
+        const rqBadge = buildRemarqueBadge(j.remarque, j.date, 'font-size:10px');
+        rows += '<tr class="' + cls + '"><td><strong>' + dd + '/' + mm + '</strong></td><td>' + jc + '</td><td style="font-size:9px">' + (buildTooltip(t) || typeLabelCourt(t)) + daTag + (rqBadge ? ' ' + rqBadge : '') + '</td><td class="mens-trav-col">' + tS + '</td><td class="mens-ecart-col' + eC + '">' + eS + '</td>' + (sal !== 'ANTONIO' ? '<td style="color:#B0BEC5">—</td>' : '') + '<td></td></tr>';
       }
     }
 
@@ -1325,7 +1286,12 @@ function renderCalCell(j, month) {
   else if (j.type && j.type !== '') ex = calAbbr(j.type);
   const n = natureOf(j.type || '');
   const bg = n ? n.couleur : '#F5F7FA';
-  return '<div class="cal-cell" style="cursor:pointer;background:' + (inM ? bg : '#F5F7FA') + ';opacity:' + (inM ? 1 : 0.4) + '" onclick="openSaisieFromCalendrier(' + JSON.stringify(j).replace(/"/g, '&quot;') + ')"><div class="cal-daynum">' + dd + '</div><div class="cal-extra">' + ex + '</div></div>';
+  // ⭐ Picto 💬 + infobulle si remarque présente
+  const rqBadge = buildRemarqueBadge(j.remarque, j.date,
+    'position:absolute;top:2px;right:2px;background:#fff;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:10px;box-shadow:0 1px 3px rgba(0,0,0,.2);z-index:1');
+  return '<div class="cal-cell" style="cursor:pointer;position:relative;background:' + (inM ? bg : '#F5F7FA') + ';opacity:' + (inM ? 1 : 0.4) + '" onclick="openSaisieFromCalendrier(' + JSON.stringify(j).replace(/"/g, '&quot;') + ')">'
+    + rqBadge
+    + '<div class="cal-daynum">' + dd + '</div><div class="cal-extra">' + ex + '</div></div>';
 }
 
 function openSaisieFromCalendrier(jour) {
@@ -1348,118 +1314,6 @@ function openSaisieFromCalendrier(jour) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-function parseHeuresSaisie(str) {
-  if (!str) return 0;
-  const s = String(str).trim();
-  if (s.includes(':')) {
-    // Format HH:MM
-    const parts = s.split(':');
-    const h = parseInt(parts[0]) || 0;
-    const m = parseInt(parts[1]) || 0;
-    return h + m / 60;
-  }
-  // Format décimal (virgule ou point)
-  return parseFloat(s.replace(',', '.')) || 0;
-}
-
-function toggleSimHeures() {
-  const contrat = document.getElementById('sim-contrat').value;
-  document.getElementById('sim-heures-group').style.display = (contrat === 'manuel') ? 'block' : 'none';
-}
-
-function calculerSimulationSalaire() {
-  const taux = parseFloat(document.getElementById('sim-taux').value);
-  const contrat = document.getElementById('sim-contrat').value;
-  const heuresStr = document.getElementById('sim-heures').value;
-  const mutuelleEuro = parseFloat(document.getElementById('sim-mutuelle').value) || 0;
-  const panierJour = parseFloat(document.getElementById('sim-panier').value) || 0;
-  const panierJours = parseInt(document.getElementById('sim-panier-jours').value) || 0;
-  const el = document.getElementById('sim-resultat');
-
-  if (!taux || taux <= 0) {
-    el.innerHTML = '<div style="color:var(--red);font-size:12px">Merci de saisir un taux horaire.</div>';
-    return;
-  }
-
-  let brut, detailHeures;
-  if (contrat === '39') {
-    // 151,67h au taux normal + 17,33h supplémentaires structurelles majorées à 25%
-    const brutNormal = 151.67 * taux;
-    const brutMajore = 17.33 * taux * 1.25;
-    brut = brutNormal + brutMajore;
-    detailHeures = `151,67 h × ${taux.toFixed(2)} € + 17,33 h × ${taux.toFixed(2)} € ×1,25`;
-  } else if (contrat === '35') {
-    brut = 151.67 * taux;
-    detailHeures = `151,67 h × ${taux.toFixed(2)} €`;
-  } else {
-    const heures = parseHeuresSaisie(heuresStr);
-    if (!heures || heures <= 0) {
-      el.innerHTML = '<div style="color:var(--red);font-size:12px">Merci de saisir un nombre d\'heures (ex: 151:40 ou 151,67).</div>';
-      return;
-    }
-    brut = heures * taux;
-    detailHeures = `${heures.toFixed(2)} h × ${taux.toFixed(2)} €`;
-  }
-
-  // Cotisations salariales — taux nationaux fixes (BTP non-cadre, 2026)
-  const vieillesse = brut * 0.0730;            // 6,90% plafonnée + 0,40% déplafonnée
-  const agircArrcoT1 = brut * 0.0315;          // Retraite complémentaire Agirc-Arrco T1
-  const ceg = brut * 0.0086;                   // Contribution d'équilibre général T1
-  const prevoyanceRnpo = brut * 0.0087;        // Prévoyance obligatoire PRO BTP (RNPO)
-  const csgCrds = brut * 0.9825 * 0.0970;      // CSG/CRDS sur 98,25% du brut
-  // Cotisation variable selon l'entreprise
-  const mutuelle = mutuelleEuro;
-
-  const chargesTotal = vieillesse + agircArrcoT1 + ceg + prevoyanceRnpo + csgCrds + mutuelle;
-  const net = brut - chargesTotal;
-  const panier = panierJour * panierJours;
-  const totalVerse = net + panier;
-  const tauxGlobalPct = (chargesTotal / brut) * 100;
-
-  const fmtEuro = (n) => n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
-
-  el.innerHTML = `
-    <div style="background:#FFF8E1;border-radius:10px;padding:14px 16px">
-      <div style="display:flex;justify-content:space-between;align-items:baseline">
-        <span style="font-size:13px;color:var(--text2)">${detailHeures}</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:6px">
-        <span style="font-size:13px;color:var(--text2)">Salaire brut estimé</span>
-        <span style="font-size:18px;font-weight:700;color:var(--text2)">${fmtEuro(brut)}</span>
-      </div>
-      <div style="border-top:1px dashed #B0BEC5;margin:8px 0"></div>
-      <div style="font-size:10px;color:var(--text2);line-height:1.8">
-        <div style="display:flex;justify-content:space-between"><span>− Vieillesse (7,30%)</span><span>${fmtEuro(vieillesse)}</span></div>
-        <div style="display:flex;justify-content:space-between"><span>− Agirc-Arrco T1 (3,15%)</span><span>${fmtEuro(agircArrcoT1)}</span></div>
-        <div style="display:flex;justify-content:space-between"><span>− CEG T1 (0,86%)</span><span>${fmtEuro(ceg)}</span></div>
-        <div style="display:flex;justify-content:space-between"><span>− Prévoyance RNPO (0,87%)</span><span>${fmtEuro(prevoyanceRnpo)}</span></div>
-        <div style="display:flex;justify-content:space-between"><span>− CSG/CRDS (9,70% sur 98,25%)</span><span>${fmtEuro(csgCrds)}</span></div>
-        ${mutuelle > 0 ? `<div style="display:flex;justify-content:space-between"><span>− Mutuelle (forfait)</span><span>${fmtEuro(mutuelle)}</span></div>` : ''}
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:8px">
-        <span style="font-size:13px;color:var(--text2);font-weight:600">= Net estimé (avant impôt)</span>
-        <span style="font-size:16px;font-weight:700;color:var(--blue)">${fmtEuro(net)}</span>
-      </div>
-      <div style="font-size:9px;color:var(--text2);text-align:right;margin-top:2px">soit ${tauxGlobalPct.toFixed(1)}% de charges salariales au total</div>
-      ${panier > 0 ? `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:6px">
-        <span style="font-size:13px;color:var(--text2)">+ Panier (${panierJours} j. × ${panierJour.toFixed(2)} €, exonéré)</span>
-        <span style="font-size:16px;font-weight:700;color:var(--green)">+${fmtEuro(panier)}</span>
-      </div>` : ''}
-      <div style="border-top:1px dashed #B0BEC5;margin:10px 0"></div>
-      <div style="display:flex;justify-content:space-between;align-items:center;background:var(--amber);border-radius:8px;padding:10px 12px">
-        <span style="font-size:12px;color:rgba(255,255,255,.9);font-weight:600">${panier > 0 ? 'Total versé estimé' : 'Net estimé (avant impôt)'}</span>
-        <span style="font-size:20px;font-weight:700;color:white">${fmtEuro(totalVerse)}</span>
-      </div>
-    </div>
-    <div style="font-size:10px;color:var(--text2);margin-top:8px;font-style:italic">
-      ⚠️ Estimation indicative uniquement. Le prélèvement à la source (impôt sur le revenu) n'est pas déduit ici,
-      il dépend du taux personnel du salarié. Le panier est supposé exonéré (à vérifier selon le plafond URSSAF
-      en vigueur et ta convention régionale). Pour un montant exact, se référer au logiciel de paie ou à l'expert-comptable.
-    </div>`;
-  document.getElementById('sim-export-btns').style.display = 'flex';
-}
-
-
 // PDF CALENDRIER
 // ═══════════════════════════════════════════════════════════════
 async function telechargerPdfCalendrier() {
