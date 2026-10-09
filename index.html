@@ -377,6 +377,8 @@ const DA_MARKER = '[[RETENUE-DA]]';               // mode Retenue salaire
 const COMPTEUR_MARKER = '[[COMPTEUR-DA]]';        // mode Compteur récup (dette)
 let currentWeekOffset = 0, currentMensSalarie = 'ANATOLE', currentMensMonthOffset = 0;
 let currentCalSalarie = 'ANATOLE', currentCalMonthOffset = 0, calLoadToken = 0;
+// Jetons anti-réponse tardive : empêchent un ancien chargement d'écraser l'écran courant.
+let semaineLoadToken = 0, mensuelLoadToken = 0, recapLoadToken = 0;
 
 document.getElementById('api-url').value = API_URL;
 
@@ -421,15 +423,17 @@ function goToCalToday() { currentCalMonthOffset = 0; loadCalendrier(); }
 // ═══════════════════════════════════════════════════════════════
 async function apiGet(p) {
   if (!API_URL) return null;
+  const c = new AbortController();
+  const t = setTimeout(() => c.abort(), 15000);
   try {
-    const c = new AbortController();
-    const t = setTimeout(() => c.abort(), 15000);
     const r = await fetch(API_URL + '?' + new URLSearchParams(p), { signal: c.signal });
-    clearTimeout(t);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
     return await r.json();
   } catch(e) {
-    showToast('❌ ' + (e.name === 'AbortError' ? 'Délai' : e.message), 4000);
+    showToast('❌ ' + (e.name === 'AbortError' ? 'Délai dépassé' : e.message), 4000);
     return null;
+  } finally {
+    clearTimeout(t);
   }
 }
 function setStatus(m) { const e = document.getElementById('nav-status'); if (e) e.textContent = m; }
@@ -656,24 +660,26 @@ function buildAlertes(salaries) {
 // SEMAINE
 // ═══════════════════════════════════════════════════════════════
 async function loadSemaine(sal) {
+  const myToken = ++semaineLoadToken;
+  const myOffset = currentWeekOffset;
   const el = document.getElementById('semaine-content');
   hideSaisie();
   if (!API_URL) { el.innerHTML = '<div class="empty">⚙️ Configurez l\'URL</div>'; return; }
   updateWeekLabel();
-  const ck = 'semaine_' + sal + '_' + currentWeekOffset;
+  const ck = 'semaine_' + sal + '_' + myOffset;
   const cached = CACHE[ck];
-  if (cached && cached.semaine && cached.semaine.length) { try { renderSemaine(cached.semaine); } catch(e) {} }
+  if (cached && cached.semaine && cached.semaine.length) { try { renderSemaine(cached.semaine, sal); } catch(e) {} }
   else el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Chargement...</div></div>';
-  const data = await apiGet({ action: 'semaine', salarie: sal, offset: currentWeekOffset });
+  const data = await apiGet({ action: 'semaine', salarie: sal, offset: myOffset });
+  if (myToken !== semaineLoadToken || sal !== currentSalarie || myOffset !== currentWeekOffset) return;
   if (!data) { if (!cached) el.innerHTML = '<div class="empty">❌ Délai dépassé</div>'; return; }
   if (data.error) { if (!cached) el.innerHTML = '<div class="empty">❌ ' + data.error + '</div>'; return; }
   if (!data.semaine || data.semaine.length === 0) { if (!cached) el.innerHTML = '<div class="empty">📅 Aucune donnée</div>'; return; }
   CACHE[ck] = data;
-  try { renderSemaine(data.semaine); } catch(e) { el.innerHTML = '<div class="empty">❌ ' + e.message + '</div>'; }
+  try { renderSemaine(data.semaine, sal); } catch(e) { el.innerHTML = '<div class="empty">❌ ' + e.message + '</div>'; }
 }
 
-function renderSemaine(jours) {
-  const sal = currentSalarie;
+function renderSemaine(jours, sal = currentSalarie) {
   const el = document.getElementById('semaine-content');
   const parseDur = s => { if (!s || s === '' || s === '0:00') return 0; const n = s.startsWith('-'); const c = s.replace('-',''); const p = c.split(':'); const m = (parseInt(p[0])||0)*60+(parseInt(p[1])||0); return n ? -m : m; };
   const minToStr = m => { const n = m<0, a = Math.abs(m); return (n?'-':'')+Math.floor(a/60)+':'+String(a%60).padStart(2,'0'); };
@@ -805,15 +811,15 @@ async function sauvegarder() {
       apiGet({ action: 'saisir_type', salarie: currentSalarie, row: currentSaisieRow.row, type: selectedType }),
       (isT && fin) ? apiGet({ action: 'saisir_fin', salarie: currentSalarie, row: currentSaisieRow.row, fin, arrivee: arr }) : Promise.resolve({ ok: true })
     ];
-    const [, r1, r2] = await Promise.all(p);
-    if (r1 && r1.ok && r2 && r2.ok) {
+    const [r0, r1, r2] = await Promise.all(p);
+    if (r0 && r0.ok && r1 && r1.ok && r2 && r2.ok) {
       delete CACHE.solde; delete CACHE.dettesDA;
       Object.keys(CACHE).forEach(k => { if (k.startsWith('semaine_' + currentSalarie) || k.startsWith('mensuel_' + currentSalarie) || k === 'recap_' + currentSalarie) delete CACHE[k]; });
       showToast('✅ Enregistré !');
       hideSaisie();
       loadSemaine(currentSalarie);
     } else {
-      showToast('❌ Erreur : ' + (r1?.error || r2?.error || 'Échec'), 6000);
+      showToast('❌ Erreur : ' + (r0?.error || r1?.error || r2?.error || 'Échec'), 6000);
       btn.disabled = false; btn.textContent = 'Enregistrer dans Sheets';
     }
   } catch(e) { showToast('❌ ' + e.message, 6000); btn.disabled = false; btn.textContent = 'Enregistrer dans Sheets'; }
@@ -826,22 +832,25 @@ async function sauvegarder() {
 // MENSUEL
 // ═══════════════════════════════════════════════════════════════
 async function loadMensuel() {
+  const myToken = ++mensuelLoadToken;
+  const sal = currentMensSalarie, offset = currentMensMonthOffset;
   const el = document.getElementById('mensuel-content');
   if (!API_URL) { el.innerHTML = '<div class="empty">⚙️ Configurez l\'URL</div>'; return; }
-  const ck = 'mensuel_' + currentMensSalarie + '_' + currentMensMonthOffset;
+  const ck = 'mensuel_' + sal + '_' + offset;
   const cached = CACHE[ck];
   if (cached && cached.mois) {
     const mn = traduireMois(cached.nomMois || '');
     document.getElementById('mens-month-label').textContent = mn.charAt(0).toUpperCase() + mn.slice(1);
-    try { renderMensuel(cached.mois, currentMensSalarie, mn, cached.semainesCompletes, cached.recupGlobal, cached.ijssServeur); } catch(e) {}
+    try { renderMensuel(cached.mois, sal, mn, cached.semainesCompletes, cached.recupGlobal, cached.ijssServeur); } catch(e) {}
   } else el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Chargement...</div></div>';
 
   const [d, dS, dR, dI] = await Promise.all([
-    apiGet({ action: 'mois', salarie: currentMensSalarie, offset: currentMensMonthOffset }),
-    apiGet({ action: 'moisCalendrier', salarie: currentMensSalarie, offset: currentMensMonthOffset }),
-    apiGet({ action: 'recuperation', salarie: currentMensSalarie }),
-    apiGet({ action: 'ijss', salarie: currentMensSalarie, offset: currentMensMonthOffset })
+    apiGet({ action: 'mois', salarie: sal, offset }),
+    apiGet({ action: 'moisCalendrier', salarie: sal, offset }),
+    apiGet({ action: 'recuperation', salarie: sal }),
+    apiGet({ action: 'ijss', salarie: sal, offset })
   ]);
+  if (myToken !== mensuelLoadToken || sal !== currentMensSalarie || offset !== currentMensMonthOffset) return;
   if (!d || !d.ok) { if (!cached) el.innerHTML = '<div class="empty">❌ ' + (d?.error || 'Erreur') + '</div>'; return; }
   const mn = traduireMois(d.nomMois || '');
   document.getElementById('mens-month-label').textContent = mn.charAt(0).toUpperCase() + mn.slice(1);
@@ -850,7 +859,7 @@ async function loadMensuel() {
   const rg = (dR && dR.ok) ? dR : null;
   const is = (dI && dI.ok) ? dI : null;
   CACHE[ck] = { ...d, semainesCompletes: sc, recupGlobal: rg, ijssServeur: is };
-  try { renderMensuel(d.mois, currentMensSalarie, mn, sc, rg, is); } catch(e) { el.innerHTML = '<div class="empty">❌ ' + e.message + '</div>'; }
+  try { renderMensuel(d.mois, sal, mn, sc, rg, is); } catch(e) { el.innerHTML = '<div class="empty">❌ ' + e.message + '</div>'; }
 }
 
 function renderMensuel(jours, sal, moisNom, semainesCompletes, recupGlobal, ijssServeur) {
@@ -1062,6 +1071,7 @@ async function updateIjssMaladie(sal, annee, mois) {
 // RÉCAP
 // ═══════════════════════════════════════════════════════════════
 async function loadRecap(sal) {
+  const myToken = ++recapLoadToken;
   const el = document.getElementById('recap-content');
   if (!API_URL) { el.innerHTML = '<div class="empty">⚙️ Configurez l\'URL</div>'; return; }
   const ck = 'recap_' + sal;
@@ -1073,6 +1083,7 @@ async function loadRecap(sal) {
     apiGet({ action: 'solidarite', salarie: sal }),
     apiGet({ action: 'dates_types', salarie: sal })
   ]);
+  if (myToken !== recapLoadToken || sal !== currentRecapSal) return;
   if (!d || d.error) { if (!cached) el.innerHTML = '<div class="alerte danger">❌ ' + (d?.error || 'Erreur') + '</div>'; return; }
   CACHE[ck] = { data: d, solData: s, datesTypes: dt };
   renderRecap(sal, d, s, dt);
@@ -1567,5 +1578,4 @@ window.addEventListener('load', async () => {
 
 </script>
 </body>
-</html>═══════════════════════════
-    
+</html>
