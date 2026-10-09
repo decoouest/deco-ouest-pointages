@@ -143,17 +143,17 @@ main{padding:16px;max-width:600px;margin:0 auto}
 .audit-panel .audit-ok{color:var(--green);font-weight:700}
 .mens-table tr.semaine-detail td{background:#F8FBFF;font-size:10px;color:var(--text2);text-align:left;padding:4px 8px;border-bottom:2px solid var(--blue);font-style:italic}
 .mens-table .type-badge{font-size:9px;color:var(--text2)}
-.cal-total-head{font-size:10px;font-weight:700;color:var(--blue);text-align:center;padding:4px 6px;background:var(--blue-l);border-radius:8px;white-space:nowrap}
-.cal-total-cell{background:var(--blue);border-radius:8px;min-height:52px;padding:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;min-width:44px;width:44px}
+.cal-total-head{font-size:11px;font-weight:700;color:var(--blue);text-align:center;padding:4px 6px;background:var(--blue-l);border-radius:8px;white-space:nowrap}
+.cal-total-cell{background:var(--blue);border-radius:8px;min-height:54px;padding:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;min-width:44px;width:44px}
 .cal-total-mois{background:var(--blue);color:white;border-radius:10px;padding:10px 16px;text-align:center;margin-top:8px}
 .cal-total-mois .val{font-size:20px;font-weight:700}
 .cal-total-mois .lbl{font-size:11px;opacity:.8;margin-bottom:4px}
-.cal-head{text-align:center;font-size:8px;font-weight:700;color:var(--text2);text-transform:uppercase;padding:2px 0}
-.cal-cell{border-radius:8px;min-height:40px;padding:2px 2px;position:relative;display:flex;flex-direction:column}
+.cal-head{text-align:center;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;padding:5px 0}
+.cal-cell{border-radius:8px;min-height:54px;padding:4px 4px;position:relative;display:flex;flex-direction:column}
 .cal-cell.empty{background:transparent}
 .cal-cell.out-month{opacity:.35}
-.cal-daynum{font-size:5.5px;font-weight:700;color:#455A64}
-.cal-extra{font-size:4.5px;color:#455A64;margin-top:auto;font-weight:600;line-height:1}
+.cal-daynum{font-size:12px;font-weight:700;color:#263238;line-height:1.2}
+.cal-extra{font-size:10px;color:#37474F;margin-top:auto;font-weight:600;line-height:1.2;overflow-wrap:anywhere}
 .cal-cell.travaille{background:var(--blue-l)}
 .cal-cell.weekend{background:var(--gray-l)}
 .cal-cell.conge{background:#E8F5E9}
@@ -354,6 +354,67 @@ window.addEventListener('DOMContentLoaded',()=>{if(sessionStorage.getItem('deo_a
     </div>
     <button class="btn-config" onclick="calculerConges()">🧮 Calculer</button>
     <div id="cc-resultat" style="margin-top:12px"></div>
+  </div>
+  <div class="card" style="margin-top:12px;border-left:4px solid var(--amber)">
+    <div class="card-title" style="color:var(--amber)">💶 Simulateur de salaire (estimation)</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:10px">
+      Estime le salaire net à partir d'un taux horaire. <strong>⚠️ Ce n'est pas un
+      vrai bulletin de paie</strong> : le calcul réel comporte des dizaines de lignes de
+      cotisations (retraite AGIRC-ARRCO par tranches, prévoyance, taux AT/MP propres à
+      l'entreprise, etc.) que seul un logiciel de paie peut établir précisément. Ici, on
+      applique un taux de charges salariales moyen, modifiable si tu connais le taux exact
+      appliqué sur les bulletins.
+    </div>
+    <div style="display:flex;gap:8px">
+      <div class="form-group" style="flex:1">
+        <label class="form-label">Taux horaire brut (€)</label>
+        <input class="config-input" type="number" step="0.01" id="sim-taux" placeholder="ex: 20.00">
+      </div>
+      <div class="form-group" style="flex:1">
+        <label class="form-label">Contrat</label>
+        <select class="config-input" id="sim-contrat" onchange="toggleSimHeures()">
+          <option value="35">35h/semaine</option>
+          <option value="39">39h/semaine (17,33h maj. 25% incl.)</option>
+          <option value="manuel">Heures manuelles</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group" id="sim-heures-group" style="display:none">
+      <label class="form-label">Heures payées ce mois</label>
+      <input class="config-input" type="text" id="sim-heures" placeholder="ex: 151:40 ou 151,67">
+    </div>
+    <div style="font-size:11px;color:var(--text2);font-weight:600;margin:10px 0 4px">Cotisations salariales (taux nationaux, fixes)</div>
+    <div style="background:var(--gray-l);border-radius:8px;padding:8px 10px;font-size:11px;color:var(--text2);line-height:1.9">
+      Vieillesse (plafonnée + déplafonnée) : <strong>7,30 %</strong><br>
+      Retraite complémentaire Agirc-Arrco T1 : <strong>3,15 %</strong><br>
+      Contribution d'équilibre général (CEG) T1 : <strong>0,86 %</strong><br>
+      Prévoyance obligatoire PRO BTP (RNPO) : <strong>0,87 %</strong><br>
+      CSG/CRDS : <strong>9,70 %</strong> sur 98,25 % du brut<br>
+      Assurance chômage : <strong>0 %</strong> &nbsp;·&nbsp; Assurance maladie : <strong>0 %</strong>
+    </div>
+    <div style="font-size:11px;color:var(--text2);font-weight:600;margin:10px 0 4px">Cotisation variable selon l'entreprise — à ajuster</div>
+    <div class="form-group">
+      <label class="form-label">Mutuelle (€/mois, forfait)</label>
+      <input class="config-input" type="number" step="0.01" id="sim-mutuelle" placeholder="ex: 45.00">
+    </div>
+    <div class="config-hint" style="margin:-6px 0 10px">La mutuelle est en général un forfait fixe (pas un %) et varie selon le contrat d'entreprise — vérifie ce montant sur un vrai bulletin.</div>
+    <div style="display:flex;gap:8px">
+      <div class="form-group" style="flex:1">
+        <label class="form-label">Indemnité de panier (€/jour)</label>
+        <input class="config-input" type="number" step="0.01" id="sim-panier" placeholder="ex: 13.00">
+      </div>
+      <div class="form-group" style="flex:1">
+        <label class="form-label">Jours travaillés (panier)</label>
+        <input class="config-input" type="number" id="sim-panier-jours" placeholder="ex: 22">
+      </div>
+    </div>
+    <div class="config-hint" style="margin:-6px 0 10px">Le panier est en principe exonéré de cotisations et d'impôt s'il respecte le plafond URSSAF, et vient s'ajouter au net. Le montant dépend de ta convention régionale (ex. Île-de-France) — vérifie-le sur un bulletin réel.</div>
+    <button class="btn-config" onclick="calculerSimulationSalaire()">💶 Estimer</button>
+    <div id="sim-resultat" style="margin-top:12px"></div>
+    <div id="sim-export-btns" style="display:none;gap:8px;margin-top:10px">
+      <button class="btn-config" style="flex:1;background:var(--green-l);color:var(--green)" id="btn-capture-sim" onclick="captureSimulateur()">📸 Image</button>
+      <button class="btn-config" style="flex:1;background:var(--blue-l);color:var(--blue)" id="btn-pdf-sim" onclick="telechargerPdfSimulateur()">📄 PDF</button>
+    </div>
   </div>
 </div>
 </main>
@@ -1287,6 +1348,118 @@ function openSaisieFromCalendrier(jour) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+function parseHeuresSaisie(str) {
+  if (!str) return 0;
+  const s = String(str).trim();
+  if (s.includes(':')) {
+    // Format HH:MM
+    const parts = s.split(':');
+    const h = parseInt(parts[0]) || 0;
+    const m = parseInt(parts[1]) || 0;
+    return h + m / 60;
+  }
+  // Format décimal (virgule ou point)
+  return parseFloat(s.replace(',', '.')) || 0;
+}
+
+function toggleSimHeures() {
+  const contrat = document.getElementById('sim-contrat').value;
+  document.getElementById('sim-heures-group').style.display = (contrat === 'manuel') ? 'block' : 'none';
+}
+
+function calculerSimulationSalaire() {
+  const taux = parseFloat(document.getElementById('sim-taux').value);
+  const contrat = document.getElementById('sim-contrat').value;
+  const heuresStr = document.getElementById('sim-heures').value;
+  const mutuelleEuro = parseFloat(document.getElementById('sim-mutuelle').value) || 0;
+  const panierJour = parseFloat(document.getElementById('sim-panier').value) || 0;
+  const panierJours = parseInt(document.getElementById('sim-panier-jours').value) || 0;
+  const el = document.getElementById('sim-resultat');
+
+  if (!taux || taux <= 0) {
+    el.innerHTML = '<div style="color:var(--red);font-size:12px">Merci de saisir un taux horaire.</div>';
+    return;
+  }
+
+  let brut, detailHeures;
+  if (contrat === '39') {
+    // 151,67h au taux normal + 17,33h supplémentaires structurelles majorées à 25%
+    const brutNormal = 151.67 * taux;
+    const brutMajore = 17.33 * taux * 1.25;
+    brut = brutNormal + brutMajore;
+    detailHeures = `151,67 h × ${taux.toFixed(2)} € + 17,33 h × ${taux.toFixed(2)} € ×1,25`;
+  } else if (contrat === '35') {
+    brut = 151.67 * taux;
+    detailHeures = `151,67 h × ${taux.toFixed(2)} €`;
+  } else {
+    const heures = parseHeuresSaisie(heuresStr);
+    if (!heures || heures <= 0) {
+      el.innerHTML = '<div style="color:var(--red);font-size:12px">Merci de saisir un nombre d\'heures (ex: 151:40 ou 151,67).</div>';
+      return;
+    }
+    brut = heures * taux;
+    detailHeures = `${heures.toFixed(2)} h × ${taux.toFixed(2)} €`;
+  }
+
+  // Cotisations salariales — taux nationaux fixes (BTP non-cadre, 2026)
+  const vieillesse = brut * 0.0730;            // 6,90% plafonnée + 0,40% déplafonnée
+  const agircArrcoT1 = brut * 0.0315;          // Retraite complémentaire Agirc-Arrco T1
+  const ceg = brut * 0.0086;                   // Contribution d'équilibre général T1
+  const prevoyanceRnpo = brut * 0.0087;        // Prévoyance obligatoire PRO BTP (RNPO)
+  const csgCrds = brut * 0.9825 * 0.0970;      // CSG/CRDS sur 98,25% du brut
+  // Cotisation variable selon l'entreprise
+  const mutuelle = mutuelleEuro;
+
+  const chargesTotal = vieillesse + agircArrcoT1 + ceg + prevoyanceRnpo + csgCrds + mutuelle;
+  const net = brut - chargesTotal;
+  const panier = panierJour * panierJours;
+  const totalVerse = net + panier;
+  const tauxGlobalPct = (chargesTotal / brut) * 100;
+
+  const fmtEuro = (n) => n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+
+  el.innerHTML = `
+    <div style="background:#FFF8E1;border-radius:10px;padding:14px 16px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <span style="font-size:13px;color:var(--text2)">${detailHeures}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:6px">
+        <span style="font-size:13px;color:var(--text2)">Salaire brut estimé</span>
+        <span style="font-size:18px;font-weight:700;color:var(--text2)">${fmtEuro(brut)}</span>
+      </div>
+      <div style="border-top:1px dashed #B0BEC5;margin:8px 0"></div>
+      <div style="font-size:10px;color:var(--text2);line-height:1.8">
+        <div style="display:flex;justify-content:space-between"><span>− Vieillesse (7,30%)</span><span>${fmtEuro(vieillesse)}</span></div>
+        <div style="display:flex;justify-content:space-between"><span>− Agirc-Arrco T1 (3,15%)</span><span>${fmtEuro(agircArrcoT1)}</span></div>
+        <div style="display:flex;justify-content:space-between"><span>− CEG T1 (0,86%)</span><span>${fmtEuro(ceg)}</span></div>
+        <div style="display:flex;justify-content:space-between"><span>− Prévoyance RNPO (0,87%)</span><span>${fmtEuro(prevoyanceRnpo)}</span></div>
+        <div style="display:flex;justify-content:space-between"><span>− CSG/CRDS (9,70% sur 98,25%)</span><span>${fmtEuro(csgCrds)}</span></div>
+        ${mutuelle > 0 ? `<div style="display:flex;justify-content:space-between"><span>− Mutuelle (forfait)</span><span>${fmtEuro(mutuelle)}</span></div>` : ''}
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:8px">
+        <span style="font-size:13px;color:var(--text2);font-weight:600">= Net estimé (avant impôt)</span>
+        <span style="font-size:16px;font-weight:700;color:var(--blue)">${fmtEuro(net)}</span>
+      </div>
+      <div style="font-size:9px;color:var(--text2);text-align:right;margin-top:2px">soit ${tauxGlobalPct.toFixed(1)}% de charges salariales au total</div>
+      ${panier > 0 ? `<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:6px">
+        <span style="font-size:13px;color:var(--text2)">+ Panier (${panierJours} j. × ${panierJour.toFixed(2)} €, exonéré)</span>
+        <span style="font-size:16px;font-weight:700;color:var(--green)">+${fmtEuro(panier)}</span>
+      </div>` : ''}
+      <div style="border-top:1px dashed #B0BEC5;margin:10px 0"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;background:var(--amber);border-radius:8px;padding:10px 12px">
+        <span style="font-size:12px;color:rgba(255,255,255,.9);font-weight:600">${panier > 0 ? 'Total versé estimé' : 'Net estimé (avant impôt)'}</span>
+        <span style="font-size:20px;font-weight:700;color:white">${fmtEuro(totalVerse)}</span>
+      </div>
+    </div>
+    <div style="font-size:10px;color:var(--text2);margin-top:8px;font-style:italic">
+      ⚠️ Estimation indicative uniquement. Le prélèvement à la source (impôt sur le revenu) n'est pas déduit ici,
+      il dépend du taux personnel du salarié. Le panier est supposé exonéré (à vérifier selon le plafond URSSAF
+      en vigueur et ta convention régionale). Pour un montant exact, se référer au logiciel de paie ou à l'expert-comptable.
+    </div>`;
+  document.getElementById('sim-export-btns').style.display = 'flex';
+}
+
+
 // PDF CALENDRIER
 // ═══════════════════════════════════════════════════════════════
 async function telechargerPdfCalendrier() {
