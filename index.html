@@ -162,19 +162,12 @@ main{padding:16px;max-width:600px;margin:0 auto}
 .cal-cell.ferie{background:#FFF9C4}
 .cal-legend{display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:var(--text2)}
 .cal-legend span{display:flex;align-items:center;gap:4px}
-/* ⭐ Infobulle remarque custom (survol desktop) */
 .rq-hint{position:relative;display:inline-block;cursor:pointer}
-.rq-hint::after{
-  content:attr(data-rq);
-  display:none;position:absolute;left:50%;transform:translateX(-50%);
-  bottom:calc(100% + 8px);background:#263238;color:#fff;
-  padding:8px 12px;border-radius:8px;font-size:12px;font-weight:400;
-  white-space:pre-wrap;width:max-content;max-width:240px;
-  z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.3);
-  line-height:1.4;text-align:left;pointer-events:none;
-}
+.rq-hint::after{content:attr(data-rq);display:none;position:absolute;left:50%;transform:translateX(-50%);bottom:calc(100% + 8px);background:#263238;color:#fff;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:400;white-space:pre-wrap;width:max-content;max-width:240px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.3);line-height:1.4;text-align:left;pointer-events:none}
 .rq-hint:hover::after{display:block}
 .rq-hint.rq-down::after{bottom:auto;top:calc(100% + 6px)}
+.photo-zone{display:flex;align-items:center;justify-content:center;gap:10px;background:var(--gray-l);border:2px dashed #B0BEC5;border-radius:10px;padding:16px;cursor:pointer;font-size:14px;color:var(--text2)}
+.photo-status{display:none;margin-top:8px;padding:8px 10px;background:var(--green-l);border-radius:8px;font-size:12px;color:var(--green);font-weight:600}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
 </head>
@@ -295,6 +288,19 @@ window.addEventListener('DOMContentLoaded',()=>{if(sessionStorage.getItem('deo_a
         <label class="form-label">💬 Remarque / Commentaire</label>
         <textarea id="f-remarque" rows="3" placeholder="Saisir une remarque..." style="width:100%;padding:12px;border:2px solid #E0E0E0;border-radius:10px;font-size:14px;resize:vertical;font-family:inherit;outline:none;box-sizing:border-box"></textarea>
       </div>
+      <div id="photo-form" style="margin-top:12px">
+        <label class="form-label">📷 Image (colonne K)</label>
+        <div id="photo-preview" style="display:none;margin-bottom:10px;text-align:center">
+          <img id="photo-img" style="max-width:100%;border-radius:10px;max-height:180px;object-fit:cover">
+          <div style="font-size:11px;color:var(--text2);margin-top:4px" id="photo-name"></div>
+        </div>
+        <label class="photo-zone">
+          <span style="font-size:24px">📷</span>
+          <span id="photo-label">Choisir une image</span>
+          <input type="file" id="f-photo" accept="image/*" onchange="previewPhoto(this)" style="display:none">
+        </label>
+        <div class="photo-status" id="photo-status">✓ Image prête à envoyer</div>
+      </div>
       <button class="btn-save" id="btn-save" onclick="sauvegarder()" disabled>Enregistrer dans Sheets</button>
     </div>
   </div>
@@ -373,9 +379,7 @@ window.addEventListener('DOMContentLoaded',()=>{if(sessionStorage.getItem('deo_a
 
 <div class="toast" id="toast"></div>
 
-<!-- ═══════════════════════════════════════════════════════════════
-     FIN PARTIE 1/3 — Le <script> principal commence en PARTIE 2
-     ═══════════════════════════════════════════════════════════════ -->
+<!-- FIN PARTIE 1/3 -->
   <script>
 
 // ═══════════════════════════════════════════════════════════════
@@ -386,6 +390,7 @@ let API_URL = localStorage.getItem('deo_api_url') || API_URL_DEFAUT;
 const CACHE = {};
 let currentSalarie = 'ANATOLE', currentRecapSal = 'ANATOLE', currentSaisieRow = null;
 let selectedType = null, selectedDAMode = null;
+let selectedPhotoBase64 = null; // ⭐ contient l'image compressée en base64 (sans préfixe)
 const DA_MARKER = '[[RETENUE-DA]]';
 const COMPTEUR_MARKER = '[[COMPTEUR-DA]]';
 let currentWeekOffset = 0, currentMensSalarie = 'ANATOLE', currentMensMonthOffset = 0;
@@ -776,6 +781,55 @@ function afficherRemarque(date, texte) {
   m.style.display = 'flex';
 }
 
+// ═══════════════════════════════════════════════════════════════
+// PHOTO : sélection + compression (2560px max, JPEG 92%)
+// ═══════════════════════════════════════════════════════════════
+function previewPhoto(input) {
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const MAX = 2560;
+      let w = img.width, h = img.height;
+      if (w > MAX || h > MAX) {
+        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+        else       { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      const compressed = canvas.toDataURL('image/jpeg', 0.92);
+      selectedPhotoBase64 = compressed.split(',')[1];
+
+      document.getElementById('photo-img').src = compressed;
+      document.getElementById('photo-preview').style.display = 'block';
+      document.getElementById('photo-label').textContent = 'Changer l\'image';
+      document.getElementById('photo-status').style.display = 'block';
+      const sizeKB = Math.round(selectedPhotoBase64.length * 0.75 / 1024);
+      document.getElementById('photo-name').textContent = file.name + ' · ' + sizeKB + ' Ko (compressé)';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function resetPhotoForm() {
+  selectedPhotoBase64 = null;
+  const p = document.getElementById('photo-preview');
+  const s = document.getElementById('photo-status');
+  const i = document.getElementById('f-photo');
+  const l = document.getElementById('photo-label');
+  if (p) p.style.display = 'none';
+  if (s) s.style.display = 'none';
+  if (i) i.value = '';
+  if (l) l.textContent = 'Choisir une image';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SAISIE
+// ═══════════════════════════════════════════════════════════════
 function openSaisie(jour) {
   if (jour.jour === 'sam' || jour.jour === 'dim') return;
   currentSaisieRow = jour;
@@ -793,6 +847,7 @@ function openSaisie(jour) {
   selectedDAMode = hasR ? 'retenue' : (hasC ? 'compteur' : null);
   document.querySelectorAll('.da-btn').forEach(b => b.classList.toggle('selected', b.dataset.mode === selectedDAMode));
   document.getElementById('f-remarque').value = cleanRemarque(raw);
+  resetPhotoForm();
   const isT = jour.type === 'Jour Travaillé' || jour.type === 'journee solidarité travaillé';
   document.getElementById('heures-form').style.display = isT ? 'block' : 'none';
   document.getElementById('da-form').style.display = isT ? 'block' : 'none';
@@ -800,7 +855,14 @@ function openSaisie(jour) {
   document.getElementById('semaine-content').style.display = 'none';
   document.getElementById('saisie-page').style.display = 'block';
 }
-function hideSaisie() { document.getElementById('saisie-page').style.display = 'none'; document.getElementById('semaine-content').style.display = 'block'; currentSaisieRow = null; selectedType = null; selectedDAMode = null; }
+function hideSaisie() {
+  document.getElementById('saisie-page').style.display = 'none';
+  document.getElementById('semaine-content').style.display = 'block';
+  currentSaisieRow = null;
+  selectedType = null;
+  selectedDAMode = null;
+  selectedPhotoBase64 = null;
+}
 function selectType(type) {
   selectedType = type;
   document.querySelectorAll('.type-btn:not(.da-btn)').forEach(b => b.classList.remove('selected'));
@@ -832,10 +894,23 @@ async function sauvegarder() {
       (isT && fin) ? apiGet({ action: 'saisir_fin', salarie: currentSalarie, row: currentSaisieRow.row, fin, arrivee: arr }) : Promise.resolve({ ok: true })
     ];
     const [r0, r1, r2] = await Promise.all(p);
+
+    // ⭐ Envoi de l'image si sélectionnée (après le succès des autres champs)
+    let r3 = { ok: true };
+    if (selectedPhotoBase64 && r0 && r0.ok && r1 && r1.ok) {
+      btn.textContent = '📤 Envoi image...';
+      r3 = await apiGet({
+        action: 'saisir_image',
+        salarie: currentSalarie,
+        row: currentSaisieRow.row,
+        image: selectedPhotoBase64
+      });
+    }
+
     if (r0 && r0.ok && r1 && r1.ok && r2 && r2.ok) {
       delete CACHE.solde; delete CACHE.dettesDA;
       Object.keys(CACHE).forEach(k => { if (k.startsWith('semaine_' + currentSalarie) || k.startsWith('mensuel_' + currentSalarie) || k === 'recap_' + currentSalarie) delete CACHE[k]; });
-      showToast('✅ Enregistré !');
+      showToast(r3 && r3.ok ? '✅ Enregistré (avec image)' : '✅ Enregistré !');
       hideSaisie();
       loadSemaine(currentSalarie);
     } else {
@@ -978,13 +1053,11 @@ function renderMensuel(jours, sal, moisNom, semainesCompletes, recupGlobal, ijss
       const eC = (isT && j.ecart && j.ecart !== '0:00') ? (j.ecart.startsWith('-') ? ' ecart-neg' : ' ecart-pos') : '';
 
       if (duMois) {
-        // ⭐ Picto départ anticipé (si marqueur explicite)
         let daTag = '';
         if (isT && j.remarque && j.ecart && j.ecart.startsWith('-')) {
           if (j.remarque.startsWith(DA_MARKER)) daTag = ' <span title="Départ anticipé — retenue salaire" style="font-size:10px">💸</span>';
           else if (j.remarque.startsWith(COMPTEUR_MARKER)) daTag = ' <span title="Départ anticipé — dette récup" style="font-size:10px">⏳</span>';
         }
-        // ⭐ Picto remarque 💬 + infobulle
         const rqBadge = buildRemarqueBadge(j.remarque, j.date, 'font-size:10px');
         rows += '<tr class="' + cls + '"><td><strong>' + dd + '/' + mm + '</strong></td><td>' + jc + '</td><td style="font-size:9px">' + (buildTooltip(t) || typeLabelCourt(t)) + daTag + (rqBadge ? ' ' + rqBadge : '') + '</td><td class="mens-trav-col">' + tS + '</td><td class="mens-ecart-col' + eC + '">' + eS + '</td>' + (sal !== 'ANTONIO' ? '<td style="color:#B0BEC5">—</td>' : '') + '<td></td></tr>';
       }
@@ -1286,7 +1359,6 @@ function renderCalCell(j, month) {
   else if (j.type && j.type !== '') ex = calAbbr(j.type);
   const n = natureOf(j.type || '');
   const bg = n ? n.couleur : '#F5F7FA';
-  // ⭐ Picto 💬 + infobulle si remarque présente
   const rqBadge = buildRemarqueBadge(j.remarque, j.date,
     'position:absolute;top:2px;right:2px;background:#fff;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:10px;box-shadow:0 1px 3px rgba(0,0,0,.2);z-index:1');
   return '<div class="cal-cell" style="cursor:pointer;position:relative;background:' + (inM ? bg : '#F5F7FA') + ';opacity:' + (inM ? 1 : 0.4) + '" onclick="openSaisieFromCalendrier(' + JSON.stringify(j).replace(/"/g, '&quot;') + ')">'
