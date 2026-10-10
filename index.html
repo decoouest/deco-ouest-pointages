@@ -390,7 +390,7 @@ let API_URL = localStorage.getItem('deo_api_url') || API_URL_DEFAUT;
 const CACHE = {};
 let currentSalarie = 'ANATOLE', currentRecapSal = 'ANATOLE', currentSaisieRow = null;
 let selectedType = null, selectedDAMode = null;
-let selectedPhotoBase64 = null; // ⭐ contient l'image compressée en base64 (sans préfixe)
+let selectedPhotoBase64 = null;
 const DA_MARKER = '[[RETENUE-DA]]';
 const COMPTEUR_MARKER = '[[COMPTEUR-DA]]';
 let currentWeekOffset = 0, currentMensSalarie = 'ANATOLE', currentMensMonthOffset = 0;
@@ -441,7 +441,7 @@ function goToCalToday() { currentCalMonthOffset = 0; loadCalendrier(); }
 async function apiGet(p) {
   if (!API_URL) return null;
   const c = new AbortController();
-  const t = setTimeout(() => c.abort(), 15000);
+  const t = setTimeout(() => c.abort(), 25000);
   try {
     const r = await fetch(API_URL + '?' + new URLSearchParams(p), { signal: c.signal });
     if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -460,7 +460,6 @@ function strToMin(s) { if (!s) return 0; s = String(s).trim(); const n = s.start
 function cleanTime(s) { if (!s) return s; const p = s.split(':'); return p.length===3 ? p[0]+':'+p[1] : s; }
 function traduireMois(s) { const tr = {'January':'Janvier','February':'Février','March':'Mars','April':'Avril','May':'Mai','June':'Juin','July':'Juillet','August':'Août','September':'Septembre','October':'Octobre','November':'Novembre','December':'Décembre'}; for (const [en, fr] of Object.entries(tr)) if (s.includes(en)) return s.replace(en, fr); return s; }
 
-// ⭐ Nettoie une remarque des marqueurs internes
 function cleanRemarque(raw) {
   if (!raw) return '';
   return String(raw)
@@ -468,7 +467,6 @@ function cleanRemarque(raw) {
     .replace(new RegExp('^' + COMPTEUR_MARKER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), '')
     .trim();
 }
-// ⭐ Génère le HTML du picto 💬 avec infobulle et clic (mobile)
 function buildRemarqueBadge(raw, date, style) {
   const cleanRq = cleanRemarque(raw);
   if (!cleanRq) return '';
@@ -895,22 +893,34 @@ async function sauvegarder() {
     ];
     const [r0, r1, r2] = await Promise.all(p);
 
-    // ⭐ Envoi de l'image si sélectionnée (après le succès des autres champs)
+    // ⭐ Envoi de l'image par morceaux (chunks) — route saisir_photo_chunk
     let r3 = { ok: true };
     if (selectedPhotoBase64 && r0 && r0.ok && r1 && r1.ok) {
-      btn.textContent = '📤 Envoi image...';
-      r3 = await apiGet({
-        action: 'saisir_image',
-        salarie: currentSalarie,
-        row: currentSaisieRow.row,
-        image: selectedPhotoBase64
-      });
+      const imgB64 = selectedPhotoBase64;
+      const CHUNK = 2000;
+      const total = Math.ceil(imgB64.length / CHUNK);
+      let imgOk = true;
+      for (let i = 0; i < total; i++) {
+        const chunk = imgB64.substring(i * CHUNK, (i+1) * CHUNK);
+        btn.textContent = '📤 Image ' + Math.round((i+1)/total*100) + '%';
+        const rr = await apiGet({
+          action: 'saisir_photo_chunk',
+          salarie: currentSalarie,
+          row: currentSaisieRow.row,
+          chunk: encodeURIComponent(chunk),
+          idx: i,
+          total: total
+        });
+        if (!rr || rr.error) { imgOk = false; r3 = rr || { error: 'Erreur chunk ' + i }; break; }
+        if (i === total - 1) r3 = rr;
+      }
+      if (!imgOk) showToast('⚠️ Image partiellement envoyée', 4000);
     }
 
     if (r0 && r0.ok && r1 && r1.ok && r2 && r2.ok) {
       delete CACHE.solde; delete CACHE.dettesDA;
       Object.keys(CACHE).forEach(k => { if (k.startsWith('semaine_' + currentSalarie) || k.startsWith('mensuel_' + currentSalarie) || k === 'recap_' + currentSalarie) delete CACHE[k]; });
-      showToast(r3 && r3.ok ? '✅ Enregistré (avec image)' : '✅ Enregistré !');
+      showToast(r3 && r3.ok && selectedPhotoBase64 ? '✅ Enregistré (avec image)' : '✅ Enregistré !');
       hideSaisie();
       loadSemaine(currentSalarie);
     } else {
@@ -1481,7 +1491,7 @@ async function telechargerPdfCalendrier() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// PDF SOLDE / MENSUEL
+// PDF SOLDE
 // ═══════════════════════════════════════════════════════════════
 async function telechargerPdfSolde() {
   const btn = document.getElementById('btn-pdf-solde');
@@ -1520,6 +1530,9 @@ async function telechargerPdfSolde() {
   finally { btn.disabled = false; btn.textContent = '📄 Télécharger le rapport Solde en PDF'; }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// PDF MENSUEL (simple, liste jour par jour)
+// ═══════════════════════════════════════════════════════════════
 async function telechargerPdfMensuel() {
   const btn = document.getElementById('btn-pdf-mensuel');
   btn.disabled = true; btn.textContent = '⏳ Génération...';
