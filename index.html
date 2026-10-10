@@ -166,6 +166,11 @@ main{padding:16px;max-width:600px;margin:0 auto}
 .rq-hint::after{content:attr(data-rq);display:none;position:absolute;left:50%;transform:translateX(-50%);bottom:calc(100% + 8px);background:#263238;color:#fff;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:400;white-space:pre-wrap;width:max-content;max-width:240px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.3);line-height:1.4;text-align:left;pointer-events:none}
 .rq-hint:hover::after{display:block}
 .rq-hint.rq-down::after{bottom:auto;top:calc(100% + 6px)}
+.img-hint{position:relative;display:inline-block;cursor:pointer}
+.img-hint .img-pop{display:none;position:absolute;right:0;bottom:calc(100% + 8px);background:#fff;border:2px solid var(--blue);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.35);z-index:99999;padding:6px;width:260px;text-align:center}
+.img-hint .img-pop img{width:100%;border-radius:6px;display:block;max-height:200px;object-fit:cover}
+.img-hint .img-pop .legende{font-size:10px;color:var(--text2);margin-top:4px}
+.img-hint:hover .img-pop{display:block}
 .photo-zone{display:flex;align-items:center;justify-content:center;gap:10px;background:var(--gray-l);border:2px dashed #B0BEC5;border-radius:10px;padding:16px;cursor:pointer;font-size:14px;color:var(--text2)}
 .photo-status{display:none;margin-top:8px;padding:8px 10px;background:var(--green-l);border-radius:8px;font-size:12px;color:var(--green);font-weight:600}
 </style>
@@ -478,6 +483,20 @@ function buildRemarqueBadge(raw, date, style) {
     + ' onclick="event.stopPropagation(); afficherRemarque(\'' + date + '\', \'' + jsSafe + '\')">💬</span>';
 }
 
+// ⭐ Picto 📷 avec info-bulle miniature
+function buildImageBadge(photo, date, style) {
+  if (!photo || !photo.thumbUrl) return '';
+  const url = photo.thumbUrl;
+  const viewUrl = photo.viewUrl || url;
+  const extraStyle = style ? ';' + style : '';
+  return '<span class="img-hint" style="display:inline-block;vertical-align:middle' + extraStyle + '">'
+    + '<span title="Cliquer pour voir la photo HD" onclick="event.stopPropagation(); window.open(\'' + viewUrl + '\',\'_blank\')">📷</span>'
+    + '<span class="img-pop">'
+    + '<img src="' + url + '" alt="Photo ' + date + '" loading="lazy">'
+    + '<div class="legende">' + date + ' — cliquer pour la HD</div>'
+    + '</span></span>';
+}
+
 // ═══════════════════════════════════════════════════════════════
 // MATRICE NATURE
 // ═══════════════════════════════════════════════════════════════
@@ -744,6 +763,7 @@ function renderSemaine(jours, sal = currentSalarie) {
     const isRetenue = isT && j.remarque && j.remarque.startsWith(DA_MARKER) && j.ecart && j.ecart.startsWith('-');
     const isCompteur = isT && j.remarque && j.remarque.startsWith(COMPTEUR_MARKER) && j.ecart && j.ecart.startsWith('-');
     const rqBadge = buildRemarqueBadge(j.remarque, j.date);
+    const imgBadge = buildImageBadge(j.photo, j.date);
     html += '<div class="jour-row ' + typeToClass(t) + ' ' + (j.isToday ? 'today' : '') + '" onclick="openSaisie(' + JSON.stringify(j).replace(/"/g,'&quot;') + ')">'
       + (j.isToday ? '<span class="today-badge">AUJOURD\'HUI</span>' : '')
       + '<div class="jour-date">' + j.date.substring(0,5) + '</div>'
@@ -754,6 +774,7 @@ function renderSemaine(jours, sal = currentSalarie) {
       + (isRetenue ? '<div style="font-size:12px;color:var(--red);margin-left:4px" title="Départ anticipé — retenue salaire">💸</div>' : '')
       + (isCompteur ? '<div style="font-size:12px;color:var(--amber);margin-left:4px" title="Départ anticipé — dette récup">⏳</div>' : '')
       + (rqBadge ? '<div style="font-size:13px;margin-left:6px">' + rqBadge + '</div>' : '')
+      + (imgBadge ? '<div style="font-size:13px;margin-left:6px">' + imgBadge + '</div>' : '')
       + '</div>';
   }
   if (nJ > 0) {
@@ -893,7 +914,7 @@ async function sauvegarder() {
     ];
     const [r0, r1, r2] = await Promise.all(p);
 
-    // ⭐ Envoi de l'image par morceaux (chunks) — route saisir_photo_chunk
+    // ⭐ Envoi de l'image par morceaux (chunks) via saisir_photo_chunk
     let r3 = { ok: true };
     if (selectedPhotoBase64 && r0 && r0.ok && r1 && r1.ok) {
       const imgB64 = selectedPhotoBase64;
@@ -1069,7 +1090,8 @@ function renderMensuel(jours, sal, moisNom, semainesCompletes, recupGlobal, ijss
           else if (j.remarque.startsWith(COMPTEUR_MARKER)) daTag = ' <span title="Départ anticipé — dette récup" style="font-size:10px">⏳</span>';
         }
         const rqBadge = buildRemarqueBadge(j.remarque, j.date, 'font-size:10px');
-        rows += '<tr class="' + cls + '"><td><strong>' + dd + '/' + mm + '</strong></td><td>' + jc + '</td><td style="font-size:9px">' + (buildTooltip(t) || typeLabelCourt(t)) + daTag + (rqBadge ? ' ' + rqBadge : '') + '</td><td class="mens-trav-col">' + tS + '</td><td class="mens-ecart-col' + eC + '">' + eS + '</td>' + (sal !== 'ANTONIO' ? '<td style="color:#B0BEC5">—</td>' : '') + '<td></td></tr>';
+        const imgBadge = buildImageBadge(j.photo, j.date, 'font-size:10px');
+        rows += '<tr class="' + cls + '"><td><strong>' + dd + '/' + mm + '</strong></td><td>' + jc + '</td><td style="font-size:9px">' + (buildTooltip(t) || typeLabelCourt(t)) + daTag + (rqBadge ? ' ' + rqBadge : '') + (imgBadge ? ' ' + imgBadge : '') + '</td><td class="mens-trav-col">' + tS + '</td><td class="mens-ecart-col' + eC + '">' + eS + '</td>' + (sal !== 'ANTONIO' ? '<td style="color:#B0BEC5">—</td>' : '') + '<td></td></tr>';
       }
     }
 
@@ -1371,7 +1393,10 @@ function renderCalCell(j, month) {
   const bg = n ? n.couleur : '#F5F7FA';
   const rqBadge = buildRemarqueBadge(j.remarque, j.date,
     'position:absolute;top:2px;right:2px;background:#fff;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:10px;box-shadow:0 1px 3px rgba(0,0,0,.2);z-index:1');
+  const imgBadge = buildImageBadge(j.photo, j.date,
+    'position:absolute;top:2px;left:2px;background:#fff;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:10px;box-shadow:0 1px 3px rgba(0,0,0,.2);z-index:1');
   return '<div class="cal-cell" style="cursor:pointer;position:relative;background:' + (inM ? bg : '#F5F7FA') + ';opacity:' + (inM ? 1 : 0.4) + '" onclick="openSaisieFromCalendrier(' + JSON.stringify(j).replace(/"/g, '&quot;') + ')">'
+    + imgBadge
     + rqBadge
     + '<div class="cal-daynum">' + dd + '</div><div class="cal-extra">' + ex + '</div></div>';
 }
@@ -1531,46 +1556,7 @@ async function telechargerPdfSolde() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// PDF MENSUEL (simple, liste jour par jour)
-// ═══════════════════════════════════════════════════════════════
-async function telechargerPdfMensuel() {
-  const btn = document.getElementById('btn-pdf-mensuel');
-  btn.disabled = true; btn.textContent = '⏳ Génération...';
-  try {
-    const now = new Date();
-    const target = new Date(now.getFullYear(), now.getMonth() + currentMensMonthOffset, 1);
-    const moisNom = target.toLocaleDateString('fr-FR', {month:'long', year:'numeric'});
-    const ck = 'mensuel_' + currentMensSalarie + '_' + currentMensMonthOffset;
-    let j = CACHE[ck] ? CACHE[ck].mois : [];
-    if (!j.length) { const d = await apiGet({ action: 'mois', salarie: currentMensSalarie, offset: currentMensMonthOffset }); if (d && d.ok) j = d.mois; }
-    if (!j || !j.length) { showToast('❌ Aucune donnée', 4000); btn.disabled = false; btn.textContent = '📄 Télécharger le mois en PDF'; return; }
-    let rows = '';
-    for (const x of j) rows += '<tr><td>' + x.date + '</td><td>' + (x.jour || '') + '</td><td>' + typeLabelCourt(x.type) + '</td><td>' + (x.travaille || '—') + '</td><td>' + (x.ecart || '—') + '</td></tr>';
-    const pdfHtml = '<html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;padding:20px}h1{color:#1565C0;font-size:16px}table{width:100%;border-collapse:collapse;font-size:11px}th{background:#1565C0;color:white;padding:6px}td{padding:4px;border-bottom:1px solid #E0E0E0;text-align:center}</style></head><body><h1>D ECO OUEST — ' + currentMensSalarie + ' — ' + moisNom + '</h1><p style="font-size:11px;color:#607D8B">Généré le ' + new Date().toLocaleDateString('fr-FR') + '</p><table><tr><th>Date</th><th>Jour</th><th>Type</th><th>Travaillé</th><th>Écart</th></tr>' + rows + '</table></body></html>';
-    const encoded = encodeURIComponent(pdfHtml.replace(/\n\s*/g, '').replace(/>\s+</g, '><'));
-    const CHUNK = 3200;
-    const total = Math.ceil(encoded.length / CHUNK);
-    let finalR = null;
-    for (let i = 0; i < total; i++) {
-      const chunk = encoded.substring(i * CHUNK, (i+1) * CHUNK);
-      btn.textContent = '⏳ ' + Math.round((i+1)/total*100) + '%...';
-      const r = await apiGet({ action: 'pdf_mensuel_chunk', salarie: currentMensSalarie, chunk, idx: i, total });
-      if (!r || !r.ok) { showToast('❌ Erreur', 4000); break; }
-      if (i === total - 1) finalR = r;
-    }
-    if (finalR && finalR.base64) {
-      const a = document.createElement('a');
-      a.href = 'data:application/pdf;base64,' + finalR.base64;
-      a.download = 'Mensuel_' + currentMensSalarie + '_' + moisNom.replace(/ /g,'_') + '.pdf';
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      showToast('✅ PDF téléchargé !', 2000);
-    }
-  } catch(err) { showToast('❌ ' + err.message, 4000); }
-  finally { btn.disabled = false; btn.textContent = '📄 Télécharger le mois en PDF'; }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// CAPTURES
+// CAPTURES (fonctions réutilisées par le PDF mensuel)
 // ═══════════════════════════════════════════════════════════════
 const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 function downloadImage(u, f) {
@@ -1614,6 +1600,72 @@ function fitToA4(src, m, or) {
   c.drawImage(src, 0, 0, src.width, src.height, (W - w) / 2, (H - h) / 2, w, h);
   return o;
 }
+
+// ═══════════════════════════════════════════════════════════════
+// PDF MENSUEL (reproduit l'écran : capture + conversion PDF)
+// ═══════════════════════════════════════════════════════════════
+async function telechargerPdfMensuel() {
+  const btn = document.getElementById('btn-pdf-mensuel');
+  btn.disabled = true; btn.textContent = '⏳ Capture...';
+  try {
+    const el = document.getElementById('mensuel-content');
+    if (!el || !el.innerHTML.trim()) { showToast('❌ Aucune donnée', 4000); return; }
+
+    const now = new Date();
+    const target = new Date(now.getFullYear(), now.getMonth() + currentMensMonthOffset, 1);
+    const moisNom = target.toLocaleDateString('fr-FR', {month:'long', year:'numeric'});
+    const moisNomFr = moisNom.charAt(0).toUpperCase() + moisNom.slice(1);
+
+    // Masquer les colonnes journalières "Travaillé / Écart" pour un rendu plus compact
+    el.classList.add('capture-hide-daily');
+    const canvas = await captureElementComplet(el, null, 900);
+    el.classList.remove('capture-hide-daily');
+
+    btn.textContent = '⏳ Compilation PDF...';
+
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    const b64 = dataUrl.split(',')[1];
+
+    const htmlWrap = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>'
+      + '@page{size:A4;margin:10mm}'
+      + 'body{margin:0;padding:0;font-family:Arial,sans-serif}'
+      + 'h1{color:#1565C0;font-size:16px;margin:0 0 4px}'
+      + '.sub{color:#607D8B;font-size:11px;margin-bottom:10px}'
+      + 'img{width:100%;display:block}'
+      + '</style></head><body>'
+      + '<h1>D ECO OUEST — ' + currentMensSalarie + ' — ' + moisNomFr + '</h1>'
+      + '<div class="sub">Généré le ' + new Date().toLocaleDateString('fr-FR') + '</div>'
+      + '<img src="data:image/jpeg;base64,' + b64 + '">'
+      + '</body></html>';
+
+    const encoded = encodeURIComponent(htmlWrap);
+    const CHUNK = 3200;
+    const total = Math.ceil(encoded.length / CHUNK);
+    let finalR = null;
+    for (let i = 0; i < total; i++) {
+      const chunk = encoded.substring(i * CHUNK, (i+1) * CHUNK);
+      btn.textContent = '📤 ' + Math.round((i+1)/total*100) + '%';
+      const r = await apiGet({ action: 'pdf_mensuel_chunk', salarie: currentMensSalarie, chunk, idx: i, total });
+      if (!r || !r.ok) { showToast('❌ Erreur chunk ' + i, 4000); break; }
+      if (i === total - 1) finalR = r;
+    }
+
+    if (finalR && finalR.base64) {
+      const a = document.createElement('a');
+      a.href = 'data:application/pdf;base64,' + finalR.base64;
+      a.download = 'Mensuel_' + currentMensSalarie + '_' + moisNom.replace(/ /g,'_') + '.pdf';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      showToast('✅ PDF téléchargé !', 2000);
+    } else {
+      showToast('❌ PDF non généré', 4000);
+    }
+  } catch(err) { showToast('❌ ' + err.message, 4000); }
+  finally { btn.disabled = false; btn.textContent = '📄 Télécharger le mois en PDF'; }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CAPTURES IMAGES (boutons "📸 Capturer ... en image")
+// ═══════════════════════════════════════════════════════════════
 async function captureSolde() {
   const b = document.getElementById('btn-capture-solde'); b.disabled = true; b.textContent = '⏳...';
   try { const c = await captureElementComplet(document.getElementById('solde-content'), null, 760); const a = fitToA4(c); downloadImage(a.toDataURL('image/jpeg', 0.92), 'Solde_' + new Date().toLocaleDateString('fr-FR').replace(/\//g,'-') + '.jpg'); showToast('✅ Image téléchargée !', 2000); } catch(e) { showToast('❌ ' + e.message, 4000); } finally { b.disabled = false; b.textContent = '📸 Capturer Solde en image'; }
