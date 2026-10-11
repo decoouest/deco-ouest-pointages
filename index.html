@@ -384,8 +384,7 @@ window.addEventListener('DOMContentLoaded',()=>{if(sessionStorage.getItem('deo_a
 
 <div class="toast" id="toast"></div>
 
-<!-- FIN PARTIE 1/3 -->
-  <script>
+<script>
 
 // ═══════════════════════════════════════════════════════════════
 // CONSTANTES
@@ -483,7 +482,6 @@ function buildRemarqueBadge(raw, date, style) {
     + ' onclick="event.stopPropagation(); afficherRemarque(\'' + date + '\', \'' + jsSafe + '\')">💬</span>';
 }
 
-// ⭐ Picto 📷 avec info-bulle miniature
 function buildImageBadge(photo, date, style) {
   if (!photo || !photo.thumbUrl) return '';
   const url = photo.thumbUrl;
@@ -801,7 +799,7 @@ function afficherRemarque(date, texte) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// PHOTO : sélection + compression (2560px max, JPEG 92%)
+// PHOTO : compression rapide (1280px / qualité 0.75)
 // ═══════════════════════════════════════════════════════════════
 function previewPhoto(input) {
   if (!input.files || !input.files[0]) return;
@@ -810,7 +808,7 @@ function previewPhoto(input) {
   reader.onload = function(e) {
     const img = new Image();
     img.onload = function() {
-      const MAX = 2560;
+      const MAX = 1280;
       let w = img.width, h = img.height;
       if (w > MAX || h > MAX) {
         if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
@@ -820,7 +818,7 @@ function previewPhoto(input) {
       canvas.width = w; canvas.height = h;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, w, h);
-      const compressed = canvas.toDataURL('image/jpeg', 0.92);
+      const compressed = canvas.toDataURL('image/jpeg', 0.75);
       selectedPhotoBase64 = compressed.split(',')[1];
 
       document.getElementById('photo-img').src = compressed;
@@ -896,65 +894,106 @@ function selectDAMode(mode, btn) {
   else { selectedDAMode = mode; document.querySelectorAll('.da-btn').forEach(b => b.classList.remove('selected')); btn.classList.add('selected'); }
 }
 
+// ═══════════════════════════════════════════════════════════════
+// ⭐ SAUVEGARDE OPTIMISÉE (1 appel groupé + chunks parallèles)
+// ═══════════════════════════════════════════════════════════════
 async function sauvegarder() {
   if (!currentSaisieRow || !selectedType) { showToast('❌ Sélectionnez un type', 4000); return; }
-  const btn = document.getElementById('btn-save'); btn.disabled = true; btn.textContent = 'Enregistrement...';
+  const btn = document.getElementById('btn-save');
+  btn.disabled = true;
+  btn.textContent = '⏳ Enregistrement...';
+  const t0 = Date.now();
+
   try {
     let rq = document.getElementById('f-remarque').value || '';
     const isT = selectedType === 'Jour Travaillé' || selectedType === 'journee solidarité travaillé';
     rq = cleanRemarque(rq);
     if (isT && selectedDAMode === 'retenue') rq = DA_MARKER + rq;
     if (isT && selectedDAMode === 'compteur') rq = COMPTEUR_MARKER + rq;
+
     const fin = isT ? document.getElementById('f-fin').value : '';
     const arr = isT ? document.getElementById('f-arrivee').value : '';
-    const p = [
-      apiGet({ action: 'saisir_remarque', salarie: currentSalarie, row: currentSaisieRow.row, remarque: rq }),
-      apiGet({ action: 'saisir_type', salarie: currentSalarie, row: currentSaisieRow.row, type: selectedType }),
-      (isT && fin) ? apiGet({ action: 'saisir_fin', salarie: currentSalarie, row: currentSaisieRow.row, fin, arrivee: arr }) : Promise.resolve({ ok: true })
-    ];
-    const [r0, r1, r2] = await Promise.all(p);
 
-    // ⭐ Envoi de l'image par morceaux (chunks) via saisir_photo_chunk
-    let r3 = { ok: true };
-    if (selectedPhotoBase64 && r0 && r0.ok && r1 && r1.ok) {
+    // 1 SEUL appel pour type + fin + remarque
+    const rJournee = await apiGet({
+      action: 'saisir_journee',
+      salarie: currentSalarie,
+      row: currentSaisieRow.row,
+      type: selectedType,
+      fin: fin || '',
+      arrivee: arr || '',
+      remarque: rq
+    });
+
+    if (!rJournee || !rJournee.ok) {
+      showToast('❌ Erreur : ' + (rJournee?.error || 'Échec'), 6000);
+      btn.disabled = false;
+      btn.textContent = 'Enregistrer dans Sheets';
+      return;
+    }
+
+    // PHOTO : chunks parallèles
+    let imgOk = true;
+    let imgMsg = '';
+    if (selectedPhotoBase64) {
+      const CHUNK = 8000;
+      const BATCH = 5;
       const imgB64 = selectedPhotoBase64;
-      const CHUNK = 2000;
       const total = Math.ceil(imgB64.length / CHUNK);
-      let imgOk = true;
-      for (let i = 0; i < total; i++) {
-        const chunk = imgB64.substring(i * CHUNK, (i+1) * CHUNK);
-        btn.textContent = '📤 Image ' + Math.round((i+1)/total*100) + '%';
-        const rr = await apiGet({
-          action: 'saisir_photo_chunk',
-          salarie: currentSalarie,
-          row: currentSaisieRow.row,
-          chunk: encodeURIComponent(chunk),
-          idx: i,
-          total: total
-        });
-        if (!rr || rr.error) { imgOk = false; r3 = rr || { error: 'Erreur chunk ' + i }; break; }
-        if (i === total - 1) r3 = rr;
+
+      btn.textContent = '📤 Photo (0/' + total + ')';
+
+      for (let start = 0; start < total; start += BATCH) {
+        const promises = [];
+        for (let i = start; i < Math.min(start + BATCH, total); i++) {
+          const chunk = imgB64.substring(i * CHUNK, (i + 1) * CHUNK);
+          promises.push(apiGet({
+            action: 'saisir_photo_chunk',
+            salarie: currentSalarie,
+            row: currentSaisieRow.row,
+            chunk: encodeURIComponent(chunk),
+            idx: i,
+            total: total
+          }));
+        }
+        const results = await Promise.all(promises);
+        const fail = results.find(r => !r || r.error);
+        if (fail) {
+          imgOk = false;
+          imgMsg = fail.error || 'Erreur chunk';
+          break;
+        }
+        btn.textContent = '📤 Photo (' + Math.min(start + BATCH, total) + '/' + total + ')';
       }
-      if (!imgOk) showToast('⚠️ Image partiellement envoyée', 4000);
     }
 
-    if (r0 && r0.ok && r1 && r1.ok && r2 && r2.ok) {
-      delete CACHE.solde; delete CACHE.dettesDA;
-      Object.keys(CACHE).forEach(k => { if (k.startsWith('semaine_' + currentSalarie) || k.startsWith('mensuel_' + currentSalarie) || k === 'recap_' + currentSalarie) delete CACHE[k]; });
-      showToast(r3 && r3.ok && selectedPhotoBase64 ? '✅ Enregistré (avec image)' : '✅ Enregistré !');
-      hideSaisie();
-      loadSemaine(currentSalarie);
+    // Succès
+    delete CACHE.solde;
+    delete CACHE.dettesDA;
+    Object.keys(CACHE).forEach(k => {
+      if (k.startsWith('semaine_' + currentSalarie) ||
+          k.startsWith('mensuel_' + currentSalarie) ||
+          k === 'recap_' + currentSalarie) delete CACHE[k];
+    });
+
+    const dt = ((Date.now() - t0) / 1000).toFixed(1);
+    if (imgOk && selectedPhotoBase64) {
+      showToast('✅ Enregistré avec image (' + dt + 's)', 2500);
+    } else if (!imgOk) {
+      showToast('⚠️ Enregistré SANS image : ' + imgMsg, 5000);
     } else {
-      showToast('❌ Erreur : ' + (r0?.error || r1?.error || r2?.error || 'Échec'), 6000);
-      btn.disabled = false; btn.textContent = 'Enregistrer dans Sheets';
+      showToast('✅ Enregistré (' + dt + 's)', 2500);
     }
-  } catch(e) { showToast('❌ ' + e.message, 6000); btn.disabled = false; btn.textContent = 'Enregistrer dans Sheets'; }
+    hideSaisie();
+    loadSemaine(currentSalarie);
+
+  } catch(e) {
+    showToast('❌ ' + e.message, 6000);
+    btn.disabled = false;
+    btn.textContent = 'Enregistrer dans Sheets';
+  }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// FIN PARTIE 2/3 — Le <script> reste ouvert
-// ═══════════════════════════════════════════════════════════════
-    
 // ═══════════════════════════════════════════════════════════════
 // MENSUEL
 // ═══════════════════════════════════════════════════════════════
@@ -1069,7 +1108,6 @@ function renderMensuel(jours, sal, moisNom, semainesCompletes, recupGlobal, ijss
           if (isF) wFer += bj; else if (isR) wRtt += bj; else if (isC) { wCong += bj; wTravHS += bj; }
           if (duMois) { tAssim += bj; wBaseM += bj; }
         } else if (estNeutralise(t)) {
-          // neutralisé
         } else if (t !== 'week end') {
           wBase += bj;
           if (duMois) wBaseM += bj;
@@ -1556,7 +1594,7 @@ async function telechargerPdfSolde() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CAPTURES (fonctions réutilisées par le PDF mensuel)
+// CAPTURES
 // ═══════════════════════════════════════════════════════════════
 const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 function downloadImage(u, f) {
@@ -1602,7 +1640,7 @@ function fitToA4(src, m, or) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// PDF MENSUEL (reproduit l'écran : capture + conversion PDF)
+// PDF MENSUEL
 // ═══════════════════════════════════════════════════════════════
 async function telechargerPdfMensuel() {
   const btn = document.getElementById('btn-pdf-mensuel');
@@ -1610,34 +1648,17 @@ async function telechargerPdfMensuel() {
   try {
     const el = document.getElementById('mensuel-content');
     if (!el || !el.innerHTML.trim()) { showToast('❌ Aucune donnée', 4000); return; }
-
     const now = new Date();
     const target = new Date(now.getFullYear(), now.getMonth() + currentMensMonthOffset, 1);
     const moisNom = target.toLocaleDateString('fr-FR', {month:'long', year:'numeric'});
     const moisNomFr = moisNom.charAt(0).toUpperCase() + moisNom.slice(1);
-
-    // Masquer les colonnes journalières "Travaillé / Écart" pour un rendu plus compact
     el.classList.add('capture-hide-daily');
     const canvas = await captureElementComplet(el, null, 900);
     el.classList.remove('capture-hide-daily');
-
     btn.textContent = '⏳ Compilation PDF...';
-
     const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
     const b64 = dataUrl.split(',')[1];
-
-    const htmlWrap = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>'
-      + '@page{size:A4;margin:10mm}'
-      + 'body{margin:0;padding:0;font-family:Arial,sans-serif}'
-      + 'h1{color:#1565C0;font-size:16px;margin:0 0 4px}'
-      + '.sub{color:#607D8B;font-size:11px;margin-bottom:10px}'
-      + 'img{width:100%;display:block}'
-      + '</style></head><body>'
-      + '<h1>D ECO OUEST — ' + currentMensSalarie + ' — ' + moisNomFr + '</h1>'
-      + '<div class="sub">Généré le ' + new Date().toLocaleDateString('fr-FR') + '</div>'
-      + '<img src="data:image/jpeg;base64,' + b64 + '">'
-      + '</body></html>';
-
+    const htmlWrap = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>@page{size:A4;margin:10mm}body{margin:0;padding:0;font-family:Arial,sans-serif}h1{color:#1565C0;font-size:16px;margin:0 0 4px}.sub{color:#607D8B;font-size:11px;margin-bottom:10px}img{width:100%;display:block}</style></head><body><h1>D ECO OUEST — ' + currentMensSalarie + ' — ' + moisNomFr + '</h1><div class="sub">Généré le ' + new Date().toLocaleDateString('fr-FR') + '</div><img src="data:image/jpeg;base64,' + b64 + '"></body></html>';
     const encoded = encodeURIComponent(htmlWrap);
     const CHUNK = 3200;
     const total = Math.ceil(encoded.length / CHUNK);
@@ -1649,7 +1670,6 @@ async function telechargerPdfMensuel() {
       if (!r || !r.ok) { showToast('❌ Erreur chunk ' + i, 4000); break; }
       if (i === total - 1) finalR = r;
     }
-
     if (finalR && finalR.base64) {
       const a = document.createElement('a');
       a.href = 'data:application/pdf;base64,' + finalR.base64;
@@ -1664,7 +1684,7 @@ async function telechargerPdfMensuel() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CAPTURES IMAGES (boutons "📸 Capturer ... en image")
+// CAPTURES IMAGES
 // ═══════════════════════════════════════════════════════════════
 async function captureSolde() {
   const b = document.getElementById('btn-capture-solde'); b.disabled = true; b.textContent = '⏳...';
