@@ -87,7 +87,7 @@ main{padding:16px;max-width:600px;margin:0 auto}
 .spinner{width:36px;height:36px;border:3px solid #E0E0E0;border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .loader-text{color:var(--text2);font-size:13px}
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);background:#263238;color:white;padding:12px 20px;border-radius:24px;font-size:14px;font-weight:500;z-index:999;transition:transform .3s;box-shadow:0 4px 20px rgba(0,0,0,.3)}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(100px);background:#263238;color:white;padding:12px 20px;border-radius:24px;font-size:14px;font-weight:500;z-index:999;transition:transform .3s;box-shadow:0 4px 20px rgba(0,0,0,.3);max-width:90vw;text-align:center}
 .toast.show{transform:translateX(-50%) translateY(0)}
 .config-input{width:100%;padding:12px;border:2px solid #E0E0E0;border-radius:10px;font-size:13px;font-family:monospace}
 .config-hint{font-size:11px;color:var(--text2);margin-top:6px;line-height:1.5}
@@ -111,15 +111,9 @@ main{padding:16px;max-width:600px;margin:0 auto}
 .mens-table tr.absent td{background:var(--red-l)}
 .mens-table tr.rtt td{background:#F3E5F5}
 .mens-table tr.ferie td{background:#FFF9C4}
-.mens-table tr.conge td:first-child{border-left:3px solid #2E7D32}
-.mens-table tr.absent td:first-child{border-left:3px solid #C62828}
-.mens-table tr.rtt td:first-child{border-left:3px solid #9C27B0}
-.mens-table tr.ferie td:first-child{border-left:3px solid #F9A825}
-.mens-table tr.weekend td:first-child{border-left:3px solid #B0BEC5}
 .mens-table td.ecart-pos{color:#1B5E20;font-weight:600}
 .mens-table td.ecart-neg{color:#B71C1C;font-weight:600}
 .capture-hide-daily .mens-trav-col,.capture-hide-daily .mens-ecart-col{visibility:hidden}
-.mens-legende{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;font-size:11px;color:var(--text2)}
 .mens-table tr.semaine-total td{background:var(--blue-l);font-weight:700;font-size:11px;border-top:2px solid var(--blue);border-bottom:2px solid var(--blue);padding:7px 4px}
 .mens-table tr.semaine-total td.fort{background:var(--blue);color:#fff}
 .mens-table tr.semaine-total.sem-ok td{background:var(--green-l);border-top:2px solid var(--green);border-bottom:2px solid var(--green)}
@@ -142,7 +136,6 @@ main{padding:16px;max-width:600px;margin:0 auto}
 .audit-panel td:last-child{font-weight:700;text-align:right}
 .audit-panel .audit-ok{color:var(--green);font-weight:700}
 .mens-table tr.semaine-detail td{background:#F8FBFF;font-size:10px;color:var(--text2);text-align:left;padding:4px 8px;border-bottom:2px solid var(--blue);font-style:italic}
-.mens-table .type-badge{font-size:9px;color:var(--text2)}
 .cal-total-head{font-size:11px;font-weight:700;color:var(--blue);text-align:center;padding:4px 6px;background:var(--blue-l);border-radius:8px;white-space:nowrap}
 .cal-total-cell{background:var(--blue);border-radius:8px;min-height:54px;padding:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;min-width:44px;width:44px}
 .cal-total-mois{background:var(--blue);color:white;border-radius:10px;padding:10px 16px;text-align:center;margin-top:8px}
@@ -440,7 +433,7 @@ function changeCalMonth(d) { currentCalMonthOffset += d; loadCalendrier(); }
 function goToCalToday() { currentCalMonthOffset = 0; loadCalendrier(); }
 
 // ═══════════════════════════════════════════════════════════════
-// API + UTILS
+// API GET + POST
 // ═══════════════════════════════════════════════════════════════
 async function apiGet(p) {
   if (!API_URL) return null;
@@ -453,10 +446,29 @@ async function apiGet(p) {
   } catch(e) {
     showToast('❌ ' + (e.name === 'AbortError' ? 'Délai dépassé' : e.message), 4000);
     return null;
-  } finally {
-    clearTimeout(t);
-  }
+  } finally { clearTimeout(t); }
 }
+
+// ⭐ apiPost : envoie la photo en 1 seule requête (rapide)
+async function apiPost(body, timeoutMs) {
+  if (!API_URL) return null;
+  const c = new AbortController();
+  const t = setTimeout(() => c.abort(), timeoutMs || 90000);
+  try {
+    const r = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(body),
+      signal: c.signal
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.json();
+  } catch(e) {
+    showToast('❌ ' + (e.name === 'AbortError' ? 'Délai dépassé' : e.message), 5000);
+    return null;
+  } finally { clearTimeout(t); }
+}
+
 function setStatus(m) { const e = document.getElementById('nav-status'); if (e) e.textContent = m; }
 function showToast(m, d = 3000) { const t = document.getElementById('toast'); if (!t) { console.log('[toast]', m); return; } t.textContent = m; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), d); }
 function minsToStr2(m) { const n = m<0, a = Math.abs(m); return (n?'-':'') + Math.floor(a/60) + ':' + String(a%60).padStart(2,'0'); }
@@ -481,7 +493,6 @@ function buildRemarqueBadge(raw, date, style) {
     + ' style="display:inline-block;vertical-align:middle;cursor:pointer' + extraStyle + '"'
     + ' onclick="event.stopPropagation(); afficherRemarque(\'' + date + '\', \'' + jsSafe + '\')">💬</span>';
 }
-
 function buildImageBadge(photo, date, style) {
   if (!photo || !photo.thumbUrl) return '';
   const url = photo.thumbUrl;
@@ -533,16 +544,6 @@ function estMaladieAvecSubrogation(t) { return t === 'ARRET MALADIE AVEC SUBROGA
 function estMaladieSansSubrogation(t) { return t === 'ARRET MALADIE SANS SUBROGATION'; }
 function estAssimile(t) { return !!natureOf(t).assim && !natureOf(t).trav; }
 function estNeutralise(t) { return !natureOf(t).trav && !natureOf(t).assim; }
-
-function calculerOuvrablesCIBTP(cd) {
-  if (!cd.length) return { ouvrables: 0, feries: 0 };
-  const dts = [...cd].sort((a, b) => a - b);
-  let o = 0, f = 0, ds = dts[0], fs = dts[0];
-  const clore = () => { const d = new Date(ds); while (d <= fs) { const w = d.getDay(); if (w !== 0) { if (estFerieDate(d)) f++; else o++; } d.setDate(d.getDate() + 1); } };
-  for (let i = 1; i < dts.length; i++) { const e = Math.round((dts[i] - fs) / 86400000); if (e <= 4) fs = dts[i]; else { clore(); ds = dts[i]; fs = dts[i]; } }
-  clore();
-  return { ouvrables: o, feries: f };
-}
 
 function typeToClass(t) {
   if (!t) return 'travaille';
@@ -895,7 +896,7 @@ function selectDAMode(mode, btn) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ⭐ SAUVEGARDE OPTIMISÉE (1 appel groupé + chunks parallèles)
+// ⭐ SAUVEGARDE OPTIMISÉE (GET groupé + POST photo)
 // ═══════════════════════════════════════════════════════════════
 async function sauvegarder() {
   if (!currentSaisieRow || !selectedType) { showToast('❌ Sélectionnez un type', 4000); return; }
@@ -914,7 +915,7 @@ async function sauvegarder() {
     const fin = isT ? document.getElementById('f-fin').value : '';
     const arr = isT ? document.getElementById('f-arrivee').value : '';
 
-    // 1 SEUL appel pour type + fin + remarque
+    // ⭐ 1 seul appel GET pour type + fin + remarque
     const rJournee = await apiGet({
       action: 'saisir_journee',
       salarie: currentSalarie,
@@ -926,44 +927,26 @@ async function sauvegarder() {
     });
 
     if (!rJournee || !rJournee.ok) {
-      showToast('❌ Erreur : ' + (rJournee?.error || 'Échec'), 6000);
+      showToast('❌ Erreur saisie : ' + (rJournee?.error || 'inconnue'), 6000);
       btn.disabled = false;
       btn.textContent = 'Enregistrer dans Sheets';
       return;
     }
 
-    // PHOTO : chunks parallèles
+    // ⭐ PHOTO : 1 SEUL appel POST (rapide)
     let imgOk = true;
     let imgMsg = '';
     if (selectedPhotoBase64) {
-      const CHUNK = 8000;
-      const BATCH = 5;
-      const imgB64 = selectedPhotoBase64;
-      const total = Math.ceil(imgB64.length / CHUNK);
-
-      btn.textContent = '📤 Photo (0/' + total + ')';
-
-      for (let start = 0; start < total; start += BATCH) {
-        const promises = [];
-        for (let i = start; i < Math.min(start + BATCH, total); i++) {
-          const chunk = imgB64.substring(i * CHUNK, (i + 1) * CHUNK);
-          promises.push(apiGet({
-            action: 'saisir_photo_chunk',
-            salarie: currentSalarie,
-            row: currentSaisieRow.row,
-            chunk: encodeURIComponent(chunk),
-            idx: i,
-            total: total
-          }));
-        }
-        const results = await Promise.all(promises);
-        const fail = results.find(r => !r || r.error);
-        if (fail) {
-          imgOk = false;
-          imgMsg = fail.error || 'Erreur chunk';
-          break;
-        }
-        btn.textContent = '📤 Photo (' + Math.min(start + BATCH, total) + '/' + total + ')';
+      btn.textContent = '📤 Envoi image...';
+      const rPhoto = await apiPost({
+        action: 'saisir_photo',
+        salarie: currentSalarie,
+        row: currentSaisieRow.row,
+        imageBase64: selectedPhotoBase64
+      }, 90000);
+      if (!rPhoto || !rPhoto.ok) {
+        imgOk = false;
+        imgMsg = rPhoto?.error || 'Échec photo';
       }
     }
 
@@ -980,7 +963,7 @@ async function sauvegarder() {
     if (imgOk && selectedPhotoBase64) {
       showToast('✅ Enregistré avec image (' + dt + 's)', 2500);
     } else if (!imgOk) {
-      showToast('⚠️ Enregistré SANS image : ' + imgMsg, 5000);
+      showToast('⚠️ Enregistré SANS image : ' + imgMsg, 6000);
     } else {
       showToast('✅ Enregistré (' + dt + 's)', 2500);
     }
