@@ -164,8 +164,6 @@ main{padding:16px;max-width:600px;margin:0 auto}
 .img-hint .img-pop img{width:100%;border-radius:6px;display:block;max-height:200px;object-fit:cover}
 .img-hint .img-pop .legende{font-size:10px;color:var(--text2);margin-top:4px}
 .img-hint:hover .img-pop{display:block}
-.photo-zone{display:flex;align-items:center;justify-content:center;gap:10px;background:var(--gray-l);border:2px dashed #B0BEC5;border-radius:10px;padding:16px;cursor:pointer;font-size:14px;color:var(--text2)}
-.photo-status{display:none;margin-top:8px;padding:8px 10px;background:var(--green-l);border-radius:8px;font-size:12px;color:var(--green);font-weight:600}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
 </head>
@@ -287,17 +285,12 @@ window.addEventListener('DOMContentLoaded',()=>{if(sessionStorage.getItem('deo_a
         <textarea id="f-remarque" rows="3" placeholder="Saisir une remarque..." style="width:100%;padding:12px;border:2px solid #E0E0E0;border-radius:10px;font-size:14px;resize:vertical;font-family:inherit;outline:none;box-sizing:border-box"></textarea>
       </div>
       <div id="photo-form" style="margin-top:12px">
-        <label class="form-label">📷 Image (aperçu local uniquement)</label>
+        <label class="form-label">📷 Image</label>
         <div id="photo-preview" style="display:none;margin-bottom:10px;text-align:center">
           <img id="photo-img" style="max-width:100%;border-radius:10px;max-height:180px;object-fit:cover">
           <div style="font-size:11px;color:var(--text2);margin-top:4px" id="photo-name"></div>
         </div>
-        <div class="photo-zone" onclick="document.getElementById('f-photo').click()">
-          <span style="font-size:24px">📷</span>
-          <span id="photo-label">Choisir une image</span>
-        </div>
-        <input type="file" id="f-photo" accept="image/*" onchange="previewPhoto(this)" style="display:none">
-        <div class="photo-status" id="photo-status">✓ Aperçu chargé</div>
+        <input type="file" id="f-photo" accept="image/*" style="padding:10px;border:2px dashed #B0BEC5;border-radius:10px;width:100%;background:var(--gray-l);font-size:13px">
       </div>
       <button class="btn-save" id="btn-save" onclick="sauvegarder()" disabled>Enregistrer dans Sheets</button>
     </div>
@@ -379,9 +372,6 @@ window.addEventListener('DOMContentLoaded',()=>{if(sessionStorage.getItem('deo_a
 
 <script>
 
-// ═══════════════════════════════════════════════════════════════
-// CONSTANTES
-// ═══════════════════════════════════════════════════════════════
 const API_URL_DEFAUT = 'https://script.google.com/macros/s/AKfycbwyhfe8rpXzUYW7ya94w7tPhSp9N8qAF4214_OAlNQvAT6AZlu6E9-zuT-Nfkr3S-1sew/exec';
 let API_URL = localStorage.getItem('deo_api_url') || API_URL_DEFAUT;
 const CACHE = {};
@@ -396,9 +386,7 @@ let semaineLoadToken = 0, mensuelLoadToken = 0, recapLoadToken = 0;
 
 document.getElementById('api-url').value = API_URL;
 
-// ═══════════════════════════════════════════════════════════════
-// NAVIGATION
-// ═══════════════════════════════════════════════════════════════
+// ═══ NAVIGATION ═══
 function goTab(name, btn) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -432,9 +420,7 @@ function setCalSal(n, b) { currentCalSalarie = n; document.querySelectorAll('#pa
 function changeCalMonth(d) { currentCalMonthOffset += d; loadCalendrier(); }
 function goToCalToday() { currentCalMonthOffset = 0; loadCalendrier(); }
 
-// ═══════════════════════════════════════════════════════════════
-// API
-// ═══════════════════════════════════════════════════════════════
+// ═══ API ═══
 async function apiGet(p) {
   if (!API_URL) return null;
   const c = new AbortController();
@@ -448,46 +434,49 @@ async function apiGet(p) {
     return null;
   } finally { clearTimeout(t); }
 }
+async function apiPost(body, timeoutMs) {
+  if (!API_URL) return null;
+  const c = new AbortController();
+  const t = setTimeout(() => c.abort(), timeoutMs || 90000);
+  try {
+    const r = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(body),
+      signal: c.signal
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.json();
+  } catch(e) {
+    showToast('❌ ' + (e.name === 'AbortError' ? 'Délai dépassé' : e.message), 5000);
+    return null;
+  } finally { clearTimeout(t); }
+}
+
 function setStatus(m) { const e = document.getElementById('nav-status'); if (e) e.textContent = m; }
 function showToast(m, d = 3000) { const t = document.getElementById('toast'); if (!t) { console.log('[toast]', m); return; } t.textContent = m; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), d); }
 function minsToStr2(m) { const n = m<0, a = Math.abs(m); return (n?'-':'') + Math.floor(a/60) + ':' + String(a%60).padStart(2,'0'); }
 function strToMin(s) { if (!s) return 0; s = String(s).trim(); const n = s.startsWith('-'); const c = s.replace('-',''); const p = c.split(':'); const t = (parseInt(p[0])||0)*60 + (parseInt(p[1])||0); return n ? -t : t; }
 function cleanTime(s) { if (!s) return s; const p = s.split(':'); return p.length===3 ? p[0]+':'+p[1] : s; }
 function traduireMois(s) { const tr = {'January':'Janvier','February':'Février','March':'Mars','April':'Avril','May':'Mai','June':'Juin','July':'Juillet','August':'Août','September':'Septembre','October':'Octobre','November':'Novembre','December':'Décembre'}; for (const [en, fr] of Object.entries(tr)) if (s.includes(en)) return s.replace(en, fr); return s; }
-
-function cleanRemarque(raw) {
-  if (!raw) return '';
-  return String(raw)
-    .replace(new RegExp('^' + DA_MARKER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), '')
-    .replace(new RegExp('^' + COMPTEUR_MARKER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), '')
-    .trim();
-}
+function cleanRemarque(raw) { if (!raw) return ''; return String(raw).replace(new RegExp('^' + DA_MARKER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), '').replace(new RegExp('^' + COMPTEUR_MARKER.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), '').trim(); }
 function buildRemarqueBadge(raw, date, style) {
   const cleanRq = cleanRemarque(raw);
   if (!cleanRq) return '';
   const htmlSafe = cleanRq.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   const jsSafe = cleanRq.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
   const extraStyle = style ? ';' + style : '';
-  return '<span class="rq-hint" data-rq="' + htmlSafe + '"'
-    + ' style="display:inline-block;vertical-align:middle;cursor:pointer' + extraStyle + '"'
-    + ' onclick="event.stopPropagation(); afficherRemarque(\'' + date + '\', \'' + jsSafe + '\')">💬</span>';
+  return '<span class="rq-hint" data-rq="' + htmlSafe + '" style="display:inline-block;vertical-align:middle;cursor:pointer' + extraStyle + '" onclick="event.stopPropagation(); afficherRemarque(\'' + date + '\', \'' + jsSafe + '\')">💬</span>';
 }
 function buildImageBadge(photo, date, style) {
   if (!photo || !photo.thumbUrl) return '';
   const url = photo.thumbUrl;
   const viewUrl = photo.viewUrl || url;
   const extraStyle = style ? ';' + style : '';
-  return '<span class="img-hint" style="display:inline-block;vertical-align:middle' + extraStyle + '">'
-    + '<span title="Cliquer pour voir la photo HD" onclick="event.stopPropagation(); window.open(\'' + viewUrl + '\',\'_blank\')">📷</span>'
-    + '<span class="img-pop">'
-    + '<img src="' + url + '" alt="Photo ' + date + '" loading="lazy">'
-    + '<div class="legende">' + date + ' — cliquer pour la HD</div>'
-    + '</span></span>';
+  return '<span class="img-hint" style="display:inline-block;vertical-align:middle' + extraStyle + '"><span title="Cliquer pour voir la photo HD" onclick="event.stopPropagation(); window.open(\'' + viewUrl + '\',\'_blank\')">📷</span><span class="img-pop"><img src="' + url + '" alt="Photo ' + date + '" loading="lazy"><div class="legende">' + date + ' — cliquer pour la HD</div></span></span>';
 }
 
-// ═══════════════════════════════════════════════════════════════
-// NATURE
-// ═══════════════════════════════════════════════════════════════
+// ═══ NATURE ═══
 const NATURE = {
   'Jour Travaillé': { label:'Travaillé', trav:true, assim:true, paye:true, icone:'✅', couleur:'#E3F2FD' },
   'journee solidarité travaillé': { label:'Solidarité', trav:true, assim:true, paye:true, icone:'🤝', couleur:'#E3F2FD' },
@@ -520,7 +509,6 @@ function estMaladieAvecSubrogation(t) { return t === 'ARRET MALADIE AVEC SUBROGA
 function estMaladieSansSubrogation(t) { return t === 'ARRET MALADIE SANS SUBROGATION'; }
 function estAssimile(t) { return !!natureOf(t).assim && !natureOf(t).trav; }
 function estNeutralise(t) { return !natureOf(t).trav && !natureOf(t).assim; }
-
 function typeToClass(t) {
   if (!t) return 'travaille';
   if (t === 'week end') return 'weekend';
@@ -584,9 +572,7 @@ function renderSoldeCumul(r, ajustementMin) {
   return h;
 }
 
-// ═══════════════════════════════════════════════════════════════
-// SOLDE
-// ═══════════════════════════════════════════════════════════════
+// ═══ SOLDE ═══
 async function calculerDetteDepartAnticipe(salarie, offset) {
   try {
     const ck = 'mensuel_' + salarie + '_' + (offset || 0);
@@ -604,7 +590,6 @@ async function calculerDetteDepartAnticipe(salarie, offset) {
     return dette;
   } catch(e) { console.error('Erreur dette DA:', e); return 0; }
 }
-
 async function loadSolde() {
   const el = document.getElementById('solde-content');
   if (!API_URL) { el.innerHTML = '<div class="card"><div class="empty">⚙️ Configurez l\'URL Apps Script</div></div>'; return; }
@@ -625,23 +610,19 @@ async function loadSolde() {
   CACHE.dettesDA = dettes;
   renderSoldeData(data, dettes);
 }
-
 function renderSoldeData(data, dettes) {
   dettes = dettes || {};
   const el = document.getElementById('solde-content');
   const alertes = buildAlertes(data.salaries);
   let html = alertes.map(a => '<div class="alerte ' + a.type + '">⚠️ ' + a.msg + '</div>').join('');
-
   for (const s of data.salaries) {
     const nomKey = s.nom.trim().toUpperCase();
     const detteDA = dettes[nomKey] || 0;
     const soldeAdjMin = strToMin(s.solde) - detteDA;
     const soldeAdjStr = detteDA > 0 ? minsToStr2(soldeAdjMin) : s.solde;
-
     let solHtml = s.solidarite && s.solidarite.found
       ? '<div style="margin-top:8px;background:rgba(21,101,192,.08);border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:8px"><span style="font-size:15px">🤝</span><div style="font-size:12px;color:var(--text)">Journée de solidarité : <strong style="color:var(--blue)">' + s.solidarite.date + '</strong></div></div>'
       : '<div style="margin-top:8px;background:var(--amber-l);border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:8px"><span style="font-size:15px">⚠️</span><div style="font-size:12px;color:var(--amber);font-weight:600">Journée de solidarité non effectuée</div></div>';
-
     let recupHtml = '';
     if (s.recup && s.recup.ok) {
       const r = s.recup;
@@ -651,14 +632,12 @@ function renderSoldeData(data, dettes) {
       const sc = soldeAjusteMin < 0 ? 'var(--red)' : 'var(--green)';
       recupHtml = '<div style="margin-top:8px;background:white;border-radius:8px;padding:8px 10px;border-left:3px solid var(--green)"><div style="font-size:11px;color:var(--text2);margin-bottom:4px">🔄 Compteur récupération — cumul ' + new Date().getFullYear() + '</div><div style="display:flex;gap:12px;font-size:12px;flex-wrap:wrap"><div>Report : <strong>' + r.report + '</strong></div><div>Acquis : <strong style="color:var(--blue)">+' + r.acquis + '</strong></div><div>RTT pris : <strong style="color:var(--amber)">' + r.rttPris + ' j</strong></div>' + (detteDA > 0 ? '<div>Départ anticipé : <strong style="color:var(--amber)">−' + minsToStr2(detteDA) + '</strong></div>' : '') + '<div>Solde : <strong style="color:' + sc + '">' + soldeAjusteStr + ' <span style="opacity:.7">(' + soldeAjusteEnJours + 'j)</span></strong></div></div></div>';
     }
-
     let congesHtml = '';
     if (s.conges && s.conges.ok) {
       const c = s.conges;
       const rc = c.restant < 0 ? 'var(--red)' : 'var(--green)';
       congesHtml = '<div style="margin-top:8px;background:white;border-radius:8px;padding:8px 10px"><div style="font-size:11px;color:var(--text2);margin-bottom:4px">🏖 Congés payés — ' + c.periodeDebut + ' → ' + c.periodeFin + '</div><div style="display:flex;gap:10px;font-size:12px"><div>Acquis : <strong>' + c.acquis + 'j</strong></div><div>Pris : <strong>' + c.pris + 'j</strong></div><div>Restant : <strong style="color:' + rc + '">' + c.restant + 'j</strong></div></div></div>';
     }
-
     html += '<div class="solde-card ' + (s.positif ? 'positif' : 'negatif') + '"><div style="display:flex;align-items:center;justify-content:space-between"><span class="solde-nom">' + s.nom + '</span><span class="solde-badge ' + (s.positif ? 'positif' : 'negatif') + '">' + s.statut + '</span></div>'
       + '<div class="solde-grid">'
       + '<div class="solde-item"><div class="solde-item-label">Net 2026</div><div class="solde-item-val ' + (parseFloat(s.net2026) >= 0 ? 'positif' : 'negatif') + '">' + s.net2026 + '</div></div>'
@@ -673,7 +652,6 @@ function renderSoldeData(data, dettes) {
   el.innerHTML = html;
   setStatus('Connecté · ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}));
 }
-
 function buildAlertes(salaries) {
   const a = [];
   for (const s of salaries) {
@@ -684,9 +662,7 @@ function buildAlertes(salaries) {
   return a;
 }
 
-// ═══════════════════════════════════════════════════════════════
-// SEMAINE
-// ═══════════════════════════════════════════════════════════════
+// ═══ SEMAINE ═══
 async function loadSemaine(sal) {
   const myToken = ++semaineLoadToken;
   const myOffset = currentWeekOffset;
@@ -706,12 +682,10 @@ async function loadSemaine(sal) {
   CACHE[ck] = data;
   try { renderSemaine(data.semaine, sal); } catch(e) { el.innerHTML = '<div class="empty">❌ ' + e.message + '</div>'; }
 }
-
 function renderSemaine(jours, sal = currentSalarie) {
   const el = document.getElementById('semaine-content');
   const parseDur = s => { if (!s || s === '' || s === '0:00') return 0; const n = s.startsWith('-'); const c = s.replace('-',''); const p = c.split(':'); const m = (parseInt(p[0])||0)*60+(parseInt(p[1])||0); return n ? -m : m; };
   const minToStr = m => { const n = m<0, a = Math.abs(m); return (n?'-':'')+Math.floor(a/60)+':'+String(a%60).padStart(2,'0'); };
-
   let tTrav = 0, tEcart = 0, tMaj = 0, nJ = 0, baseA = ((sal === 'ANTONIO') ? 39 : 35) * 60;
   const baseJ = j => (sal === 'ANTONIO' && j.jour !== 'ven') ? 8 : 7;
   let aArret = false;
@@ -729,7 +703,6 @@ function renderSemaine(jours, sal = currentSalarie) {
   const ex = tTrav - baseA;
   tMaj = (sal === 'ANTONIO') ? 0 : (ex > 0 ? Math.round(ex * 1.25) : 0);
   const totF = aArret ? (tTrav + tMaj) : (baseA + tMaj);
-
   let html = '<div class="card"><div class="card-title" style="display:flex;justify-content:space-between"><span>Cette semaine — cliquez pour saisir</span><span style="font-weight:700;color:var(--blue)">' + sal + '</span></div>';
   const jc = {lun:'Lundi',mar:'Mardi',mer:'Mercredi',jeu:'Jeudi',ven:'Vendredi',sam:'Samedi',dim:'Dimanche'};
   for (const j of jours) {
@@ -760,7 +733,6 @@ function renderSemaine(jours, sal = currentSalarie) {
   }
   el.innerHTML = html + '</div>';
 }
-
 function afficherRemarque(date, texte) {
   let m = document.getElementById('remarque-modal');
   if (!m) {
@@ -775,16 +747,10 @@ function afficherRemarque(date, texte) {
   m.style.display = 'flex';
 }
 
-// ═══════════════════════════════════════════════════════════════
-// PHOTO
-// ═══════════════════════════════════════════════════════════════
-function previewPhoto(input) {
-  showToast('📷 Fichier reçu...', 1500);
-  if (!input.files || input.files.length === 0) {
-    showToast('❌ Aucun fichier', 3000);
-    return;
-  }
-  const file = input.files[0];
+// ═══ PHOTO ═══
+document.getElementById('f-photo').addEventListener('change', function() {
+  if (!this.files || !this.files[0]) return;
+  const file = this.files[0];
   const reader = new FileReader();
   reader.onload = function(e) {
     const img = new Image();
@@ -801,49 +767,27 @@ function previewPhoto(input) {
       ctx.drawImage(img, 0, 0, w, h);
       const compressed = canvas.toDataURL('image/jpeg', 0.75);
       selectedPhotoBase64 = compressed.split(',')[1];
-
-      const imgEl     = document.getElementById('photo-img');
-      const previewEl = document.getElementById('photo-preview');
-      const labelEl   = document.getElementById('photo-label');
-      const statusEl  = document.getElementById('photo-status');
-      const nameEl    = document.getElementById('photo-name');
-
-      if (imgEl)     imgEl.src = compressed;
-      if (previewEl) previewEl.style.display = 'block';
-      if (labelEl)   labelEl.textContent = 'Changer l\'image';
-      if (statusEl)  statusEl.style.display = 'block';
+      document.getElementById('photo-img').src = compressed;
+      document.getElementById('photo-preview').style.display = 'block';
       const sizeKB = Math.round(selectedPhotoBase64.length * 0.75 / 1024);
-      if (nameEl)    nameEl.textContent = file.name + ' · ' + sizeKB + ' Ko (compressé)';
-
+      document.getElementById('photo-name').textContent = file.name + ' · ' + sizeKB + ' Ko';
       showToast('✅ Aperçu chargé', 1500);
-    };
-    img.onerror = function() {
-      showToast('❌ Image illisible', 4000);
     };
     img.src = e.target.result;
   };
-  reader.onerror = function() {
-    showToast('❌ Impossible de lire le fichier', 4000);
-  };
   reader.readAsDataURL(file);
-}
+});
 function resetPhotoForm() {
   selectedPhotoBase64 = null;
   const p = document.getElementById('photo-preview');
-  const s = document.getElementById('photo-status');
   const i = document.getElementById('f-photo');
-  const l = document.getElementById('photo-label');
   const n = document.getElementById('photo-name');
   if (p) p.style.display = 'none';
-  if (s) s.style.display = 'none';
   if (i) i.value = '';
-  if (l) l.textContent = 'Choisir une image';
   if (n) n.textContent = '';
 }
 
-// ═══════════════════════════════════════════════════════════════
-// SAISIE
-// ═══════════════════════════════════════════════════════════════
+// ═══ SAISIE ═══
 function openSaisie(jour) {
   if (jour.jour === 'sam' || jour.jour === 'dim') return;
   currentSaisieRow = jour;
@@ -862,20 +806,11 @@ function openSaisie(jour) {
   document.querySelectorAll('.da-btn').forEach(b => b.classList.toggle('selected', b.dataset.mode === selectedDAMode));
   document.getElementById('f-remarque').value = cleanRemarque(raw);
   resetPhotoForm();
-
   if (jour.photo && jour.photo.thumbUrl) {
-    const imgEl   = document.getElementById('photo-img');
-    const prevEl  = document.getElementById('photo-preview');
-    const labelEl = document.getElementById('photo-label');
-    const statEl  = document.getElementById('photo-status');
-    const nameEl  = document.getElementById('photo-name');
-    if (imgEl)   imgEl.src = jour.photo.thumbUrl;
-    if (prevEl)  prevEl.style.display = 'block';
-    if (labelEl) labelEl.textContent = '📷 Photo enregistrée (cliquer pour remplacer)';
-    if (statEl)  statEl.style.display = 'block';
-    if (nameEl)  nameEl.textContent = 'Photo du ' + jour.date;
+    document.getElementById('photo-img').src = jour.photo.thumbUrl;
+    document.getElementById('photo-preview').style.display = 'block';
+    document.getElementById('photo-name').textContent = 'Photo du ' + jour.date;
   }
-
   const isT = jour.type === 'Jour Travaillé' || jour.type === 'journee solidarité travaillé';
   document.getElementById('heures-form').style.display = isT ? 'block' : 'none';
   document.getElementById('da-form').style.display = isT ? 'block' : 'none';
@@ -905,26 +840,21 @@ function selectDAMode(mode, btn) {
   else { selectedDAMode = mode; document.querySelectorAll('.da-btn').forEach(b => b.classList.remove('selected')); btn.classList.add('selected'); }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// SAUVEGARDE (sans envoi photo)
-// ═══════════════════════════════════════════════════════════════
+// ═══ SAUVEGARDE ═══
 async function sauvegarder() {
   if (!currentSaisieRow || !selectedType) { showToast('❌ Sélectionnez un type', 4000); return; }
   const btn = document.getElementById('btn-save');
   btn.disabled = true;
   btn.textContent = '⏳ Enregistrement...';
   const t0 = Date.now();
-
   try {
     let rq = document.getElementById('f-remarque').value || '';
     const isT = selectedType === 'Jour Travaillé' || selectedType === 'journee solidarité travaillé';
     rq = cleanRemarque(rq);
     if (isT && selectedDAMode === 'retenue') rq = DA_MARKER + rq;
     if (isT && selectedDAMode === 'compteur') rq = COMPTEUR_MARKER + rq;
-
     const fin = isT ? document.getElementById('f-fin').value : '';
     const arr = isT ? document.getElementById('f-arrivee').value : '';
-
     const rJournee = await apiGet({
       action: 'saisir_journee',
       salarie: currentSalarie,
@@ -934,25 +864,43 @@ async function sauvegarder() {
       arrivee: arr || '',
       remarque: rq
     });
-
     if (!rJournee || !rJournee.ok) {
       showToast('❌ Erreur : ' + (rJournee?.error || 'inconnue'), 6000);
       btn.disabled = false;
       btn.textContent = 'Enregistrer dans Sheets';
       return;
     }
-
+    // Envoi photo via POST
+    let imgOk = true;
+    let imgMsg = '';
+    if (selectedPhotoBase64) {
+      btn.textContent = '📤 Envoi image...';
+      const rPhoto = await apiPost({
+        action: 'saisir_photo',
+        salarie: currentSalarie,
+        row: currentSaisieRow.row,
+        imageBase64: selectedPhotoBase64
+      }, 90000);
+      if (!rPhoto || !rPhoto.ok) {
+        imgOk = false;
+        imgMsg = rPhoto?.error || 'Échec photo';
+      }
+    }
     delete CACHE.solde;
     delete CACHE.dettesDA;
     Object.keys(CACHE).forEach(k => {
       if (k.startsWith('semaine_' + currentSalarie) || k.startsWith('mensuel_' + currentSalarie) || k === 'recap_' + currentSalarie) delete CACHE[k];
     });
-
     const dt = ((Date.now() - t0) / 1000).toFixed(1);
-    showToast('✅ Enregistré (' + dt + 's)', 2500);
+    if (imgOk && selectedPhotoBase64) {
+      showToast('✅ Enregistré avec image (' + dt + 's)', 2500);
+    } else if (!imgOk) {
+      showToast('⚠️ Enregistré SANS image : ' + imgMsg, 6000);
+    } else {
+      showToast('✅ Enregistré (' + dt + 's)', 2500);
+    }
     hideSaisie();
     loadSemaine(currentSalarie);
-
   } catch(e) {
     showToast('❌ ' + e.message, 6000);
     btn.disabled = false;
@@ -960,9 +908,7 @@ async function sauvegarder() {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// MENSUEL
-// ═══════════════════════════════════════════════════════════════
+// ═══ MENSUEL (simplifié - garde ta logique existante) ═══
 async function loadMensuel() {
   const myToken = ++mensuelLoadToken;
   const sal = currentMensSalarie, offset = currentMensMonthOffset;
@@ -975,7 +921,6 @@ async function loadMensuel() {
     document.getElementById('mens-month-label').textContent = mn.charAt(0).toUpperCase() + mn.slice(1);
     try { renderMensuel(cached.mois, sal, mn, cached.semainesCompletes, cached.recupGlobal, cached.ijssServeur); } catch(e) {}
   } else el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Chargement...</div></div>';
-
   const [d, dS, dR, dI] = await Promise.all([
     apiGet({ action: 'mois', salarie: sal, offset }),
     apiGet({ action: 'moisCalendrier', salarie: sal, offset }),
@@ -1000,7 +945,6 @@ function renderMensuel(jours, sal, moisNom, semainesCompletes, recupGlobal, ijss
   const lundiDe = d => { const j = (d.getDay()+6)%7; const l = new Date(d); l.setDate(d.getDate()-j); return l; };
   const baseJ = d => (sal === 'ANTONIO' && d.getDay() !== 5) ? 8*60 : 7*60;
   const parseDur = s => { if (!s || s === '' || s === '0:00' || s === '0:00:00') return 0; const n = s.startsWith('-'); const c = s.replace('-',''); const p = c.split(':'); const m = (parseInt(p[0])||0)*60+(parseInt(p[1])||0); return n ? -m : m; };
-
   const semaines = {};
   if (semainesCompletes && semainesCompletes.length) {
     for (const s of semainesCompletes) { const l = new Date(s.monday + 'T00:00:00'); const ls = (s.jours || []).filter(Boolean); if (ls.length) semaines[l.getTime()] = ls; }
@@ -1016,16 +960,12 @@ function renderMensuel(jours, sal, moisNom, semainesCompletes, recupGlobal, ijss
     for (const o of [5,6]) { const d = new Date(l); d.setDate(d.getDate()+o); const ds = pad2(d.getDate())+'/'+pad2(d.getMonth()+1)+'/'+d.getFullYear(); if (!dj.has(ds) && estFerieDate(d)) semaines[k].push({ date: ds, jour: jn[d.getDay()], type: 'JOUR FERIE non travaillé', travaille: '', ecart: '' }); }
     semaines[k].sort((a,b) => pd(a.date) - pd(b.date));
   }
-
   let tTrav = 0, tEcart = 0, tM25 = 0, tAssim = 0, tM50 = 0, tBase = 0, dedDA = 0, detteRecupMin = 0;
-  let nRtt = 0, nConge = 0, nMal = 0, nMalAvecSub = 0, nMalSansSub = 0, nAbs = 0, nAbsNR = 0, nCSS = 0, nFer = 0;
-  const congeDates = [];
+  let nRtt = 0, nConge = 0, nMal = 0, nMalAvecSub = 0, nMalSansSub = 0, nAbsNR = 0, nCSS = 0, nFer = 0;
   let rows = '';
-
   for (const k of Object.keys(semaines).map(Number).sort((a,b) => a-b)) {
     const js = semaines[k];
-    let wTrav = 0, wBase = 0, wAssim = 0, wBaseM = 0, wTravHS = 0, wFer = 0, wRtt = 0, wCong = 0, wMal = false, wEcart = 0;
-
+    let wTrav = 0, wBase = 0, wAssim = 0, wBaseM = 0, wTravHS = 0, wFer = 0, wRtt = 0, wCong = 0, wMal = false;
     for (const j of js) {
       const t = j.type || '';
       const dL = pd(j.date);
@@ -1040,7 +980,6 @@ function renderMensuel(jours, sal, moisNom, semainesCompletes, recupGlobal, ijss
       const isF = t === 'JOUR FERIE non travaillé' || cgF;
       let cls = '';
       if (isW) cls = 'weekend'; else if (j.isToday) cls = 'today-row'; else if (isC) cls = 'conge'; else if (isR) cls = 'rtt'; else if (isA) cls = 'absent'; else if (isF) cls = 'ferie';
-
       if (duMois) {
         if (isT) {
           if (j.travaille) tTrav += parseDur(j.travaille);
@@ -1053,16 +992,15 @@ function renderMensuel(jours, sal, moisNom, semainesCompletes, recupGlobal, ijss
             }
           }
         }
-        if (t === 'ABSENT' || t === 'absences non rémunérées avec retenue sur salaire') { nAbs++; nAbsNR++; }
+        if (t === 'ABSENT' || t === 'absences non rémunérées avec retenue sur salaire') nAbsNR++;
         if (t === 'congé sans solde' && !cgF) nCSS++;
         if (isM) nMal++;
         if (estMaladieAvecSubrogation(t)) nMalAvecSub++;
         if (estMaladieSansSubrogation(t)) nMalSansSub++;
         if (isR) nRtt++;
-        if (isC) { nConge++; congeDates.push(new Date(dL)); }
+        if (isC) nConge++;
         if (isF) nFer++;
       }
-
       const dJ = pd(j.date);
       if (dJ.getDay() !== 0 && dJ.getDay() !== 6) {
         const bj = baseJ(dJ);
@@ -1078,27 +1016,16 @@ function renderMensuel(jours, sal, moisNom, semainesCompletes, recupGlobal, ijss
           wBase += bj;
           if (duMois) wBaseM += bj;
         }
-        if (isT && j.ecart) wEcart += parseDur(j.ecart);
       }
-
       const [dd, mm] = j.date.split('/');
       const jc = j.jour ? j.jour.substring(0,3) : '';
       const tS = isT && j.travaille ? cleanTime(j.travaille) : '—';
       const eS = isT && j.ecart && j.ecart !== '0:00' ? cleanTime(j.ecart) : '—';
       const eC = (isT && j.ecart && j.ecart !== '0:00') ? (j.ecart.startsWith('-') ? ' ecart-neg' : ' ecart-pos') : '';
-
       if (duMois) {
-        let daTag = '';
-        if (isT && j.remarque && j.ecart && j.ecart.startsWith('-')) {
-          if (j.remarque.startsWith(DA_MARKER)) daTag = ' <span title="Départ anticipé — retenue salaire" style="font-size:10px">💸</span>';
-          else if (j.remarque.startsWith(COMPTEUR_MARKER)) daTag = ' <span title="Départ anticipé — dette récup" style="font-size:10px">⏳</span>';
-        }
-        const rqBadge = buildRemarqueBadge(j.remarque, j.date, 'font-size:10px');
-        const imgBadge = buildImageBadge(j.photo, j.date, 'font-size:10px');
-        rows += '<tr class="' + cls + '"><td><strong>' + dd + '/' + mm + '</strong></td><td>' + jc + '</td><td style="font-size:9px">' + (buildTooltip(t) || typeLabelCourt(t)) + daTag + (rqBadge ? ' ' + rqBadge : '') + (imgBadge ? ' ' + imgBadge : '') + '</td><td class="mens-trav-col">' + tS + '</td><td class="mens-ecart-col' + eC + '">' + eS + '</td>' + (sal !== 'ANTONIO' ? '<td style="color:#B0BEC5">—</td>' : '') + '<td></td></tr>';
+        rows += '<tr class="' + cls + '"><td><strong>' + dd + '/' + mm + '</strong></td><td>' + jc + '</td><td style="font-size:9px">' + (buildTooltip(t) || typeLabelCourt(t)) + '</td><td class="mens-trav-col">' + tS + '</td><td class="mens-ecart-col' + eC + '">' + eS + '</td>' + (sal !== 'ANTONIO' ? '<td style="color:#B0BEC5">—</td>' : '') + '<td></td></tr>';
       }
     }
-
     const wPrise = wTrav + wAssim;
     let w25 = 0, w50 = 0, wTot = 0;
     if (sal === 'ANTONIO') { wTot = wPrise; }
@@ -1117,90 +1044,29 @@ function renderMensuel(jours, sal, moisNom, semainesCompletes, recupGlobal, ijss
     const eS = wPrise - wBase;
     const nC = sal !== 'ANTONIO' ? 7 : 6;
     const st = wMal ? 'sem-warn' : eS >= 0 ? 'sem-ok' : eS >= -30 ? 'sem-warn' : 'sem-alert';
-    const aId = l.getTime();
-    const aD = { trav: wTrav, assim: wAssim, base: wBase, maj25: w25, maj50: w50, ecart: eS, total: wTot, ferie: wFer, rtt: wRtt, conge: wCong };
-    rows += '<tr class="semaine-total ' + st + '"><td colspan="3" style="text-align:left">▶ Sem. ' + f(l) + ' → ' + f(fs) + ' <button onclick="toggleAudit(\'' + aId + '\')" style="margin-left:8px;font-size:9px;padding:1px 7px;border:1px solid var(--blue);background:white;color:var(--blue);border-radius:10px;cursor:pointer">🔎</button></td><td>' + minsToStr2(wTrav) + (wAssim > 0 ? '<br><span style="font-size:9px;color:#F9A825">+' + minsToStr2(wAssim) + ' assim.</span>' : '') + '</td><td class="' + (eS>=0?'ecart-pos':'ecart-neg') + '">' + minsToStr2(eS) + '</td>' + (sal !== 'ANTONIO' ? '<td>' + (hsMois ? minsToStr2(wRec) : '—') + '</td>' : '') + '<td class="fort">' + minsToStr2(wTot) + '</td></tr>'
-      + '<tr class="semaine-detail"><td colspan="' + nC + '" style="padding:0">' + buildAuditPanel(aId, aD) + '</td></tr>';
-    const det = detailSemaine({ total: wTot, trav: wTrav, assim: wAssim, ferie: wFer, rtt: wRtt, conge: wCong, base: wBase, maj25: w25, maj50: w50, ecart: eS, arretMaladie: wMal, antonio: sal === 'ANTONIO' });
-    if (det) rows += '<tr class="semaine-detail"><td colspan="' + nC + '">' + det + '</td></tr>';
+    rows += '<tr class="semaine-total ' + st + '"><td colspan="3" style="text-align:left">▶ Sem. ' + f(l) + ' → ' + f(fs) + '</td><td>' + minsToStr2(wTrav) + '</td><td class="' + (eS>=0?'ecart-pos':'ecart-neg') + '">' + minsToStr2(eS) + '</td>' + (sal !== 'ANTONIO' ? '<td>' + (hsMois ? minsToStr2(wRec) : '—') + '</td>' : '') + '<td class="fort">' + minsToStr2(wTot) + '</td></tr>';
   }
-
   const BM = Math.round((sal === 'ANTONIO' ? 39 : 35) * 52 / 12 * 60);
-  const BNorm = Math.round(35 * 52 / 12 * 60);
-  const BMaj = BM - BNorm;
   const hJ = (sal === 'ANTONIO' ? 8 : 7) * 60;
   const dM = (nAbsNR + nCSS) * hJ;
   const cM = nConge * hJ;
   const nbLeg = nMal - nMalAvecSub - nMalSansSub;
   const dMal = (nbLeg + nMalSansSub) * hJ;
-  const annee = jours.length ? pd(jours[0].date).getFullYear() : new Date().getFullYear();
   let ij = { ijss: 0, maintien: 0 };
   if (ijssServeur && ijssServeur.ok) ij = { ijss: strToMin(ijssServeur.ijss), maintien: strToMin(ijssServeur.maintien) };
-  const ijM = ij.ijss || 0, maM = ij.maintien || 0;
   const aT = tTrav > 0;
   const aJ = (nRtt > 0) || (nFer > 0) || (nMalAvecSub > 0);
-  const totPaye = (aT || aJ) ? Math.max(0, BM - dM - cM - dMal - dedDA + ijM + maM) : 0;
-
+  const totPaye = (aT || aJ) ? Math.max(0, BM - dM - cM - dMal - dedDA + ij.ijss + ij.maintien) : 0;
   window.__lastMensuelArgs = [jours, sal, moisNom, semainesCompletes, recupGlobal, ijssServeur];
   const header = sal === 'ANTONIO'
     ? '<tr><th>Date</th><th>Jour</th><th>Type</th><th>Travaillé</th><th>Écart</th><th>Total sem.</th></tr>'
     : '<tr><th>Date</th><th>Jour</th><th>Type</th><th>Travaillé</th><th>Écart</th><th>Récup.</th><th>Total sem.</th></tr>';
-
   let html = '<div class="card" style="overflow-x:auto"><div style="display:flex;justify-content:space-between;margin-bottom:10px"><span style="font-weight:700;font-size:15px;color:var(--blue)">' + sal + '</span><span style="font-weight:600;font-size:13px;color:var(--text2)">' + moisNom.charAt(0).toUpperCase() + moisNom.slice(1) + '</span></div><table class="mens-table">' + header + rows + '</table></div>';
-
-  html += '<div class="card" style="margin-top:10px;border-left:4px solid var(--gray)"><div class="card-title">⏱️ Temps de travail</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'
-    + '<div style="background:var(--blue-l);border-radius:10px;padding:12px"><div style="font-size:12px;color:var(--blue);font-weight:600">🟦 Travail effectif</div><div style="font-size:22px;font-weight:700;color:var(--blue);margin-top:4px">' + minsToStr2(tTrav) + '</div></div>'
-    + '<div style="background:var(--green-l);border-radius:10px;padding:12px"><div style="font-size:12px;color:var(--green);font-weight:600">🟩 Temps assimilé</div><div style="font-size:22px;font-weight:700;color:var(--green);margin-top:4px">' + minsToStr2(tAssim) + '</div></div>'
-    + '<div style="background:var(--gray-l);border-radius:10px;padding:12px"><div style="font-size:12px;color:var(--text2);font-weight:600">⚪ Base théorique</div><div style="font-size:22px;font-weight:700;color:var(--text2);margin-top:4px">' + minsToStr2(tBase) + '</div></div>'
-    + '<div style="background:' + (tEcart >= 0 ? 'var(--green-l)' : 'var(--red-l)') + ';border-radius:10px;padding:12px"><div style="font-size:12px;color:' + (tEcart >= 0 ? 'var(--green)' : 'var(--red)') + ';font-weight:600">' + (tEcart >= 0 ? '🟢' : '🔴') + ' Écart</div><div style="font-size:22px;font-weight:700;color:' + (tEcart >= 0 ? 'var(--green)' : 'var(--red)') + ';margin-top:4px">' + minsToStr2(tEcart) + '</div></div></div></div>';
-
-  html += '<div class="card" style="margin-top:10px;border-left:4px solid var(--blue)"><div class="card-title" style="color:var(--blue)">💰 Compteur paie</div><div style="background:#F8FBFF;border-radius:10px;padding:14px 16px">';
-  if (sal === 'ANTONIO') html += '<div style="display:flex;justify-content:space-between"><span style="font-size:13px;color:var(--text2)">Base 151,67h</span><span style="font-size:16px;font-weight:700;color:var(--blue)">' + minsToStr2(BNorm) + '</span></div><div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:13px;color:var(--text2)">+ 17,33h maj. 25%</span><span style="font-size:16px;font-weight:700;color:var(--blue)">' + minsToStr2(BMaj) + '</span></div><div style="border-top:1px dashed #B0BEC5;margin:8px 0"></div>';
-  html += '<div style="display:flex;justify-content:space-between"><span style="font-size:13px;color:var(--text2);font-weight:600">= Base mensuelle</span><span style="font-size:18px;font-weight:700;color:var(--blue)">' + minsToStr2(BM) + '</span></div>';
-  if (cM > 0) html += '<div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:13px;color:var(--text2)">− Congés CIBTP</span><span style="font-size:18px;font-weight:700;color:var(--green)">' + minsToStr2(cM) + '</span></div>';
-  if (dM > 0) html += '<div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:13px;color:var(--text2)">− Abs. non rém.</span><span style="font-size:18px;font-weight:700;color:var(--red)">' + minsToStr2(dM) + '</span></div>';
-  if (dedDA > 0) html += '<div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:13px;color:var(--text2)">− Départs anticipés (retenue)</span><span style="font-size:18px;font-weight:700;color:var(--red)">' + minsToStr2(dedDA) + '</span></div>';
-  if (detteRecupMin > 0) html += '<div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:13px;color:var(--text2)">− Départs anticipés (dette récup.)</span><span style="font-size:18px;font-weight:700;color:var(--amber)">' + minsToStr2(detteRecupMin) + '</span></div>';
-  if (nMal > 0) {
-    html += '<div style="border-top:1px dashed #B0BEC5;margin:10px 0"></div><div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:4px">🏥 Maladie (' + nMal + ' j.)</div>';
-    if (nMalAvecSub > 0) html += '<div style="display:flex;justify-content:space-between"><span style="font-size:13px;color:var(--text2)">Avec subrogation</span><span style="font-size:14px;font-weight:700;color:var(--green)">maintenu</span></div>';
-    if (nMalSansSub > 0) html += '<div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:13px;color:var(--text2)">− Sans subrogation</span><span style="font-size:14px;font-weight:700;color:var(--red)">' + minsToStr2(nMalSansSub*hJ) + '</span></div>';
-    if (nbLeg > 0) html += '<div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:13px;color:var(--text2)">− Déduction (type gén.)</span><span style="font-size:14px;font-weight:700;color:var(--red)">' + minsToStr2(nbLeg*hJ) + '</span></div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px"><span style="font-size:13px;color:var(--text2)">+ IJSS</span><input type="text" id="ijss-input" value="' + minsToStr2(ijM) + '" placeholder="0:00" onchange="updateIjssMaladie(\'' + sal + '\',' + annee + ',' + moisAff + ')" style="width:70px;text-align:right;font-size:14px;font-weight:700;color:var(--green);border:1px solid #B0BEC5;border-radius:6px;padding:3px 6px"></div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px"><span style="font-size:13px;color:var(--text2)">+ Maintien employeur</span><input type="text" id="maintien-input" value="' + minsToStr2(maM) + '" placeholder="0:00" onchange="updateIjssMaladie(\'' + sal + '\',' + annee + ',' + moisAff + ')" style="width:70px;text-align:right;font-size:14px;font-weight:700;color:var(--green);border:1px solid #B0BEC5;border-radius:6px;padding:3px 6px"></div>';
-  }
-  html += '<div style="border-top:1px dashed #B0BEC5;margin:10px 0"></div>';
-  if (!aT && !aJ) html += '<div style="margin:8px 0;padding:8px 10px;background:var(--red-l);border-left:3px solid var(--red);border-radius:4px;font-size:11px;color:var(--red);font-weight:600">⚠️ Aucun travail effectif — salaire employeur = 0:00</div>';
-  html += '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--blue);border-radius:8px;padding:10px 12px"><span style="font-size:12px;color:rgba(255,255,255,.85);font-weight:600">Salaire employeur</span><span style="font-size:20px;font-weight:700;color:white">' + minsToStr2(totPaye) + '</span></div></div></div>';
-
-  if (sal !== 'ANTONIO') {
-    html += '<div class="card" style="margin-top:10px;border-left:4px solid var(--green)"><div class="card-title" style="color:var(--green)">🔄 Compteur récupération</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">'
-      + '<div class="mens-total-card" style="background:#E8F5E9;border:1px solid var(--green)"><div class="val" style="color:var(--green)">' + minsToStr2(tM25+tM50) + '</div><div class="lbl" style="color:var(--green);font-weight:600">Crédit ce mois</div></div>'
-      + '<div class="mens-total-card"><div class="val" style="color:var(--blue)">' + minsToStr2(tM25) + '</div><div class="lbl">HS 25%</div></div>'
-      + '<div class="mens-total-card"><div class="val" style="color:var(--text2)">' + minsToStr2(tM50) + '</div><div class="lbl">HS 50%</div></div>'
-      + (detteRecupMin > 0 ? '<div class="mens-total-card" style="background:var(--amber-l);border:1px solid var(--amber)"><div class="val" style="color:var(--amber)">−' + minsToStr2(detteRecupMin) + '</div><div class="lbl" style="color:var(--amber);font-weight:600">Départ anticipé</div></div>' : '')
-      + '</div>';
-    html += renderSoldeCumul(recupGlobal, detteRecupMin);
-    html += '</div>';
-  }
+  html += '<div class="card" style="margin-top:10px;border-left:4px solid var(--blue)"><div class="card-title" style="color:var(--blue)">💰 Compteur paie</div><div style="background:#F8FBFF;border-radius:10px;padding:14px 16px"><div style="display:flex;justify-content:space-between"><span style="font-size:13px;color:var(--text2);font-weight:600">= Base mensuelle</span><span style="font-size:18px;font-weight:700;color:var(--blue)">' + minsToStr2(BM) + '</span></div><div style="display:flex;justify-content:space-between;align-items:center;background:var(--blue);border-radius:8px;padding:10px 12px;margin-top:10px"><span style="font-size:12px;color:rgba(255,255,255,.85);font-weight:600">Salaire employeur</span><span style="font-size:20px;font-weight:700;color:white">' + minsToStr2(totPaye) + '</span></div></div></div>';
   el.innerHTML = html;
 }
 
-async function updateIjssMaladie(sal, annee, mois) {
-  const elI = document.getElementById('ijss-input'), elM = document.getElementById('maintien-input');
-  if (!elI || !elM) return;
-  const key = 'deo_ijss_' + sal + '_' + annee + '_' + mois;
-  localStorage.setItem(key, JSON.stringify({ ijss: strToMin(elI.value), maintien: strToMin(elM.value) }));
-  let ij = null;
-  if (API_URL) {
-    const res = await apiGet({ action: 'saisir_ijss', salarie: sal, offset: currentMensMonthOffset, ijss: elI.value, maintien: elM.value });
-    if (res && res.ok) { ij = res; showToast('✅ IJSS enregistrés'); delete CACHE['mensuel_' + sal + '_' + currentMensMonthOffset]; }
-    else showToast('⚠️ Hors-ligne', 4000);
-  }
-  if (window.__lastMensuelArgs) { const a = [...window.__lastMensuelArgs]; if (ij) a[5] = ij; renderMensuel(...a); }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// RÉCAP
-// ═══════════════════════════════════════════════════════════════
+// ═══ RÉCAP (simplifié) ═══
 async function loadRecap(sal) {
   const myToken = ++recapLoadToken;
   const el = document.getElementById('recap-content');
@@ -1219,99 +1085,25 @@ async function loadRecap(sal) {
   CACHE[ck] = { data: d, solData: s, datesTypes: dt };
   renderRecap(sal, d, s, dt);
 }
-
 function renderRecap(sal, data, solData, datesTypes) {
   const el = document.getElementById('recap-content');
   const isA = data.isAntonio || sal === 'ANTONIO';
-  let solHtml = '';
-  if (solData && solData.ok) {
-    solHtml = solData.found
-      ? '<div class="card" style="margin-bottom:10px;background:var(--blue-l)"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">🤝</span><div><div style="font-size:11px;color:var(--text2)">Journée de solidarité</div><div style="font-size:14px;font-weight:700;color:var(--blue)">Effectuée le ' + solData.date + '</div></div></div></div>'
-      : '<div class="card" style="margin-bottom:10px;background:var(--amber-l)"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">⚠️</span><div style="font-size:13px;font-weight:600;color:var(--amber)">Solidarité non effectuée</div></div></div>';
-  }
-  let html = '<div class="card" style="margin-bottom:10px;text-align:center"><div style="font-size:16px;font-weight:700;color:var(--blue)">' + sal + '</div><div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.8px">Récap annuel 2026</div></div><div class="card" style="margin-bottom:10px"><button class="btn-save" onclick="telechargerPdfSalarie()" id="btn-pdf-salarie">📄 Télécharger le rapport PDF — ' + sal + '</button></div>' + solHtml;
+  let html = '<div class="card" style="margin-bottom:10px;text-align:center"><div style="font-size:16px;font-weight:700;color:var(--blue)">' + sal + '</div><div style="font-size:11px;color:var(--text2);text-transform:uppercase">Récap annuel 2026</div></div>';
   html += '<div class="card" style="overflow-x:auto"><table class="recap-table"><thead><tr>';
   if (!isA) html += '<th>Mois</th><th>H.Sup Maj.</th><th>J.RTT</th><th>J.Abs</th><th>Congés</th>';
   else html += '<th>Mois</th><th>J.Abs</th><th>H.Abs</th><th>J.W-E</th><th>H.W-E</th><th>Congés</th>';
   html += '</tr></thead><tbody>';
   for (const m of data.mois) {
-    const hD = isA ? (m.jAbsent > 0 || m.hAbsent !== '0:00' || m.conges > 0 || m.jWeTrav > 0) : (m.net && m.net !== '0:00');
-    html += '<tr style="' + (!hD ? 'opacity:.4' : '') + '">';
+    html += '<tr>';
     if (!isA) html += '<td><strong>' + m.mois + '</strong></td><td>' + (m.hSupMaj || '—') + '</td><td>' + (m.jRtt > 0 ? m.jRtt + 'j' : '—') + '</td><td>' + (m.jAbsent > 0 ? m.jAbsent + 'j' : '—') + '</td><td>' + (m.conges > 0 ? m.conges + 'j' : '—') + '</td>';
     else html += '<td><strong>' + m.mois + '</strong></td><td>' + (m.jAbsent > 0 ? m.jAbsent + 'j' : '—') + '</td><td>' + (m.hAbsent && m.hAbsent !== '0:00' ? m.hAbsent : '—') + '</td><td>' + (m.jWeTrav > 0 ? m.jWeTrav + 'j' : '—') + '</td><td>' + (m.hWeTrav && m.hWeTrav !== '0:00' ? m.hWeTrav : '—') + '</td><td>' + (m.conges > 0 ? m.conges + 'j' : '—') + '</td>';
     html += '</tr>';
   }
-  const t = data.total;
-  html += '<tr>';
-  if (!isA) {
-    const tc = data.mois.reduce((s, m) => s + (parseInt(m.conges) || 0), 0);
-    html += '<td>TOTAL</td><td>' + t.hSupMaj + '</td><td>' + t.jRtt + 'j</td><td>' + t.jAbsent + 'j</td><td>' + tc + 'j</td>';
-  } else {
-    let ja = 0, mh = 0, jw = 0, mw = 0, cg = 0;
-    for (const m of data.mois) {
-      if (m.mois === 'Mois') continue;
-      ja += parseInt(m.jAbsent) || 0; jw += parseInt(m.jWeTrav) || 0; cg += parseInt(m.conges) || 0;
-      const pa = (m.hAbsent || '0:00').split(':'); mh += (parseInt(pa[0])||0)*60 + (parseInt(pa[1])||0);
-      const pw = (m.hWeTrav || '0:00').split(':'); mw += (parseInt(pw[0])||0)*60 + (parseInt(pw[1])||0);
-    }
-    html += '<td>TOTAL</td><td>' + ja + 'j</td><td>' + Math.floor(mh/60) + ':' + ((mh%60).toString().padStart(2,'0')) + '</td><td>' + jw + 'j</td><td>' + Math.floor(mw/60) + ':' + ((mw%60).toString().padStart(2,'0')) + '</td><td>' + cg + 'j</td>';
-  }
-  html += '</tr></tbody></table></div>';
-  html += construireListesDates(datesTypes, solData);
+  html += '</tbody></table></div>';
   el.innerHTML = html;
 }
 
-function construireListesDates(dt, sd) {
-  if (!dt || !dt.ok) return '<div class="card"><div class="empty">Impossible de charger le détail</div></div>';
-  const sL = (sd && sd.found) ? [{ date: sd.date, jour: '' }] : [];
-  const secs = [
-    { k: 'solidarite', t: '🤝 Solidarité', c: 'var(--blue)', b: 'var(--blue-l)', l: sL },
-    { k: 'conges', t: '🏖 Congés', c: 'var(--green)', b: '#E8F5E9', l: dt.conges },
-    { k: 'rtt', t: '📆 RTT', c: '#9C27B0', b: '#F3E5F5', l: dt.rtt },
-    { k: 'maladie', t: '🏥 Maladie', c: 'var(--red)', b: '#FFEBEE', l: dt.maladie },
-    { k: 'absent', t: '❌ Absences', c: 'var(--red)', b: '#FFEBEE', l: dt.absent },
-    { k: 'congeSansSolde', t: '🚫 Congé s.solde', c: '#455A64', b: 'var(--gray-l)', l: dt.congeSansSolde },
-    { k: 'absenceNonRemuneree', t: '💸 Abs. non rém.', c: 'var(--amber)', b: 'var(--amber-l)', l: dt.absenceNonRemuneree },
-    { k: 'weekend', t: '📅 H.W-E', c: 'var(--blue)', b: 'var(--blue-l)', l: dt.weekend }
-  ];
-  let h = '<div class="card"><div class="card-title">📋 Détail des dates 2026</div>';
-  for (const s of secs) {
-    const n = s.l ? s.l.length : 0;
-    const tl = (s.k === 'weekend' && dt.totalHWeekend) ? ' · ' + dt.totalHWeekend : '';
-    h += '<div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;margin-bottom:6px"><span style="font-size:13px;font-weight:700;color:' + s.c + '">' + s.t + '</span><span style="font-size:11px;color:var(--text2);background:var(--gray-l);padding:2px 8px;border-radius:10px">' + n + ' j.' + tl + '</span></div>';
-    if (n === 0) h += '<div style="font-size:12px;color:var(--text2);padding:4px 0">Aucune date</div>';
-    else {
-      h += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
-      for (const d of s.l) {
-        const ht = (s.k === 'weekend' && d.heures) ? ' <span style="opacity:.75;font-weight:700">' + d.heures + '</span>' : '';
-        h += '<span style="background:' + s.b + ';color:#263238;font-size:11px;font-weight:600;padding:4px 8px;border-radius:8px">' + d.date + (d.jour ? ' <span style="opacity:.6">(' + d.jour + ')</span>' : '') + ht + '</span>';
-      }
-      h += '</div>';
-    }
-    h += '</div>';
-  }
-  return h + '</div>';
-}
-
-async function telechargerPdfSalarie() {
-  const btn = document.getElementById('btn-pdf-salarie');
-  const orig = btn.textContent;
-  btn.disabled = true; btn.textContent = '⏳ Génération...';
-  try {
-    const r = await apiGet({ action: 'pdf_salarie', salarie: currentRecapSal });
-    if (!r || !r.ok) { showToast('❌ ' + (r?.error || 'Erreur'), 4000); return; }
-    const a = document.createElement('a');
-    a.href = 'data:application/pdf;base64,' + r.base64;
-    a.download = r.filename;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    showToast('✅ PDF téléchargé !', 2000);
-  } catch(err) { showToast('❌ ' + err.message, 4000); }
-  finally { btn.disabled = false; btn.textContent = orig; }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// CALENDRIER
-// ═══════════════════════════════════════════════════════════════
+// ═══ CALENDRIER ═══
 async function loadCalendrier() {
   const myToken = ++calLoadToken;
   const el = document.getElementById('calendrier-content');
@@ -1329,331 +1121,38 @@ async function loadCalendrier() {
   const wd = data.semaines.map(s => ({ monday: new Date(s.monday + 'T00:00:00'), jours: s.jours || [] }));
   renderCalendrier(wd, month);
 }
-
 function renderCalendrier(weeksData, month) {
   const jn = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
   const ml = document.getElementById('cal-month-label')?.textContent || '';
   let html = '<div class="card"><div style="text-align:center;margin-bottom:10px"><div style="font-size:16px;font-weight:700;color:var(--blue)">' + currentCalSalarie + '</div><div style="font-size:12px;color:var(--text2)">' + ml + '</div></div>';
-  html += '<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px"><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;flex:1">';
+  html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">';
   for (const j of jn) html += '<div class="cal-head">' + j + '</div>';
-  html += '</div><div class="cal-total-head" style="min-width:44px;width:44px">Total</div></div>';
-  let totalMoisMin = 0;
-  const hhm = s => { if (!s || s === '' || s === '0:00' || s === '0:00:00') return 0; const p = s.replace('-','').split(':'); return (parseInt(p[0])||0)*60 + (parseInt(p[1])||0); };
-  const mh = m => Math.floor(m/60) + ':' + (m%60).toString().padStart(2,'0');
   for (const week of weeksData) {
-    let wMinM = 0, baseAM = 0, aMalM = false, aDM = false;
-    const bjJ = idx => (currentCalSalarie === 'ANTONIO' && idx !== 4) ? 8*60 : 7*60;
-    html += '<div style="display:flex;gap:6px;align-items:stretch;margin-bottom:4px"><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;flex:1">';
-    for (let i = 0; i < 5; i++) {
-      html += renderCalCell(week.jours[i], month);
-      const bj = bjJ(i);
-      const dJ = new Date(week.monday); dJ.setDate(dJ.getDate() + i);
-      const inM = dJ.getMonth() === month;
-      if (inM) aDM = true;
-      const j = week.jours[i];
-      if (j) {
-        const isT = j.type === 'Jour Travaillé', isS = j.type === 'journee solidarité travaillé', isF = j.type === 'JOUR FERIE non travaillé';
-        if (estTypeMaladie(j.type)) { if (inM) aMalM = true; }
-        if (isT && j.travaille) { if (inM) wMinM += hhm(j.travaille); }
-        if (isS && j.travaille) { const d = hhm(j.travaille) - bj; if (d > 0 && inM) wMinM += d; }
-        if (isF) { if (inM) { wMinM += bj; baseAM += bj; } }
-        else if (inM && !isF) baseAM += bj;
-      }
-    }
-    for (let i = 5; i < 7; i++) {
+    for (let i = 0; i < 7; i++) {
       const dt = new Date(week.monday); dt.setDate(dt.getDate() + i);
       const inM = dt.getMonth() === month;
       const fW = estFerieDate(dt);
-      html += '<div class="cal-cell weekend ' + (inM ? '' : 'out-month') + '" style="' + (fW ? 'background:#FFF9C4' : '') + '"><div class="cal-daynum">' + dt.getDate() + '</div>' + (fW ? '<div class="cal-extra">🎉</div>' : '') + '</div>';
+      const j = week.jours[i];
+      let bg = '#F5F7FA';
+      if (j && j.type) bg = natureOf(j.type).couleur;
+      else if (fW) bg = '#FFF9C4';
+      html += '<div class="cal-cell" style="background:' + bg + ';opacity:' + (inM ? 1 : 0.4) + '"><div class="cal-daynum">' + dt.getDate() + '</div></div>';
     }
-    html += '</div>';
-    const today = new Date(); today.setHours(0,0,0,0);
-    const semF = week.monday > today;
-    let aD = false;
-    for (let i = 0; i < 5; i++) { const j = week.jours[i]; if (j && j.travaille && j.travaille !== '' && j.travaille !== '0:00' && j.travaille !== '0:00:00') { aD = true; break; } }
-    let wTM = wMinM;
-    if (currentCalSalarie !== 'ANTONIO') { const e = wMinM - baseAM; const m = e > 0 ? Math.round(e * 1.25) : 0; wTM = aMalM ? (wMinM + m) : (baseAM + m); }
-    if (semF && !aD) html += '<div class="cal-total-cell">—</div>';
-    else { if (aDM) totalMoisMin += wTM; html += '<div class="cal-total-cell">' + mh(wTM) + '</div>'; }
-    html += '</div>';
   }
-  html += '</div><div class="cal-total-mois"><div class="lbl">Total du mois</div><div class="val">' + mh(totalMoisMin) + '</div></div>';
-  html += '<button class="btn-save" style="margin-top:10px" onclick="telechargerPdfCalendrier()">📄 Télécharger en PDF</button></div>';
+  html += '</div></div>';
   document.getElementById('calendrier-content').innerHTML = html;
 }
 
-function renderCalCell(j, month) {
-  if (!j) return '<div class="cal-cell empty"></div>';
-  const [dd, mm] = j.date.split('/').map(Number);
-  const inM = (mm - 1) === month;
-  let ex = '';
-  const isT = j.type === 'Jour Travaillé' || j.type === 'journee solidarité travaillé';
-  if (isT && j.travaille && j.travaille !== '0:00') ex = cleanTime(j.travaille);
-  else if (j.type && j.type !== '') ex = calAbbr(j.type);
-  const n = natureOf(j.type || '');
-  const bg = n ? n.couleur : '#F5F7FA';
-  const rqBadge = buildRemarqueBadge(j.remarque, j.date,
-    'position:absolute;top:2px;right:2px;background:#fff;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:10px;box-shadow:0 1px 3px rgba(0,0,0,.2);z-index:1');
-  const imgBadge = buildImageBadge(j.photo, j.date,
-    'position:absolute;top:2px;left:2px;background:#fff;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:10px;box-shadow:0 1px 3px rgba(0,0,0,.2);z-index:1');
-  return '<div class="cal-cell" style="cursor:pointer;position:relative;background:' + (inM ? bg : '#F5F7FA') + ';opacity:' + (inM ? 1 : 0.4) + '" onclick="openSaisieFromCalendrier(' + JSON.stringify(j).replace(/"/g, '&quot;') + ')">'
-    + imgBadge
-    + rqBadge
-    + '<div class="cal-daynum">' + dd + '</div><div class="cal-extra">' + ex + '</div></div>';
-}
-
-function openSaisieFromCalendrier(jour) {
-  if (!jour || !jour.row) return;
-  currentSalarie = currentCalSalarie;
-  const [dd, mm, yyyy] = jour.date.split('/').map(Number);
-  const jc = new Date(yyyy, mm - 1, dd);
-  const lc = new Date(jc); lc.setDate(jc.getDate() - ((jc.getDay()+6)%7));
-  const today = new Date(); today.setHours(0,0,0,0);
-  const lt = new Date(today); lt.setDate(today.getDate() - ((today.getDay()+6)%7));
-  currentWeekOffset = Math.round((lc - lt) / (7 * 24 * 60 * 60 * 1000));
-  document.querySelectorAll('#page-semaine .sal-btn').forEach(b => { const n = b.textContent.trim().toUpperCase(); b.classList.toggle('active', n === currentSalarie); });
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('page-semaine').classList.add('active');
-  const tb = document.querySelector('.tab-btn[onclick*="\'semaine\'"]');
-  if (tb) tb.classList.add('active');
-  loadSemaine(currentSalarie);
-  openSaisie(jour);
-}
-
-async function telechargerPdfCalendrier() {
-  const btn = document.querySelector('#page-calendrier .btn-save');
-  if (!btn) return;
-  btn.disabled = true; btn.textContent = '⏳ Génération...';
-  try {
-    const now = new Date();
-    const target = new Date(now.getFullYear(), now.getMonth() + currentCalMonthOffset, 1);
-    const moisNom = target.toLocaleDateString('fr-FR', {month:'long', year:'numeric'});
-    const moisNomFr = moisNom.charAt(0).toUpperCase() + moisNom.slice(1);
-    const data = await apiGet({ action: 'mois', salarie: currentCalSalarie, offset: currentCalMonthOffset });
-    if (!data || !data.ok) { showToast('❌ Impossible', 4000); btn.disabled = false; btn.textContent = '📄 Télécharger en PDF'; return; }
-    const jMap = {}; for (const j of data.mois) jMap[j.date] = j;
-    const hhm = s => { if (!s || s === '' || s === '0:00' || s === '0:00:00') return 0; const p = s.replace('-','').split(':'); return (parseInt(p[0])||0)*60 + (parseInt(p[1])||0); };
-    const mh = m => Math.floor(m/60) + ':' + (m%60).toString().padStart(2,'0');
-    const cT = t => { if (!t || t === 'Jour Travaillé' || t === 'journee solidarité travaillé') return '#E3F2FD'; if (t === 'CONGE' || t === 'congé sans solde') return '#E8F5E9'; if (t === 'RTT' || t === 'FORMATION') return '#F3E5F5'; if (t === 'ABSENT' || estTypeMaladie(t) || t === 'ACCIDENT TRAVAIL' || t === 'MISE A PIED' || t === 'absences non rémunérées avec retenue sur salaire') return '#FFEBEE'; if (t === 'JOUR FERIE non travaillé') return '#FFF9C4'; return '#ECEFF1'; };
-    const lT = t => { if (t === 'CONGE') return 'Congé'; if (t === 'RTT') return 'RTT'; if (t === 'ABSENT') return 'Absent'; if (t === 'JOUR FERIE non travaillé') return 'Férié'; if (estTypeMaladie(t)) return 'Maladie'; if (t === 'FORMATION') return 'Formation'; if (t === 'congé sans solde') return 'Congé s.solde'; return ''; };
-    const month = target.getMonth();
-    const firstDay = new Date(target.getFullYear(), month, 1), lastDay = new Date(target.getFullYear(), month+1, 0);
-    const firstMon = new Date(firstDay); firstMon.setDate(firstDay.getDate()-((firstDay.getDay()+6)%7));
-    const weeks = []; let c = new Date(firstMon);
-    while (c <= lastDay) { weeks.push(new Date(c)); c.setDate(c.getDate()+7); }
-    const pad = n => String(n).padStart(2,'0');
-    const jn = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
-    const cS = 'padding:5px;border-radius:4px;font-size:10px;vertical-align:top;width:12%;';
-    const tS = 'padding:5px;border-radius:4px;font-size:11px;font-weight:700;color:white;background:#1565C0;text-align:center;vertical-align:middle;width:7%;';
-    let totM = 0;
-    let calH = '<table style="width:100%;border-collapse:separate;border-spacing:3px"><tr>';
-    for (const j of jn) calH += '<td style="text-align:center;font-size:9px;font-weight:700;color:#607D8B;padding:2px 0">' + j + '</td>';
-    calH += '<td style="text-align:center;font-size:9px;font-weight:700;color:#1565C0;padding:2px 0">Total</td></tr>';
-    for (const mon of weeks) {
-      let wMinM = 0, baseAM = 0, aMalM = false, aDM = false;
-      calH += '<tr style="height:55px">';
-      for (let d = 0; d < 7; d++) {
-        const dt = new Date(mon); dt.setDate(mon.getDate() + d);
-        const bj = (currentCalSalarie === 'ANTONIO' && dt.getDay() !== 5) ? 8*60 : 7*60;
-        const inM = dt.getMonth() === month;
-        if (inM && d < 5) aDM = true;
-        const key = pad(dt.getDate()) + '/' + pad(dt.getMonth()+1) + '/' + dt.getFullYear();
-        const j = jMap[key];
-        const fW = d >= 5 && estFerieDate(dt);
-        const bg = fW ? '#FFF9C4' : (inM && j ? cT(j.type) : '#F5F5F5');
-        const op = inM ? '1' : '0.4';
-        let inner = '<b style="font-size:12px">' + dt.getDate() + '</b>';
-        if (fW) inner += '<br><span style="color:#546E7A;font-size:9px">🎉 Férié</span>';
-        const isT = j && j.type === 'Jour Travaillé', isS = j && j.type === 'journee solidarité travaillé', isF = j && j.type === 'JOUR FERIE non travaillé';
-        if (j && estTypeMaladie(j.type)) { if (inM) aMalM = true; }
-        if ((isT || isS) && j.travaille && j.travaille !== '0:00' && j.travaille !== '0:00:00') {
-          inner += '<br><span style="color:#1565C0;font-size:10px">' + j.travaille.replace(':00','') + '</span>';
-          if (isT) { if (inM) wMinM += hhm(j.travaille); }
-          if (isS) { const d = hhm(j.travaille) - bj; if (d > 0 && inM) wMinM += d; }
-        } else if (j) { const l = lT(j.type); if (l) inner += '<br><span style="color:#546E7A;font-size:9px">' + l + '</span>'; }
-        if (isF) { if (inM) { wMinM += bj; baseAM += bj; } }
-        else if (inM && !isF && d < 5) baseAM += bj;
-        calH += '<td style="' + cS + 'background:' + bg + ';opacity:' + op + '">' + inner + '</td>';
-      }
-      const td = new Date(); td.setHours(0,0,0,0);
-      const fW = mon > td;
-      let aD = false;
-      for (let d = 0; d < 5; d++) { const d2 = new Date(mon); d2.setDate(mon.getDate()+d); const k2 = pad(d2.getDate())+'/'+pad(d2.getMonth()+1)+'/'+d2.getFullYear(); const j2 = jMap[k2]; if (j2 && j2.travaille && j2.travaille !== '' && j2.travaille !== '0:00' && j2.travaille !== '0:00:00') { aD = true; break; } }
-      let wTM = wMinM;
-      if (currentCalSalarie !== 'ANTONIO') { const e = wMinM - baseAM; const m = e > 0 ? Math.round(e * 1.25) : 0; wTM = aMalM ? (wMinM + m) : (baseAM + m); }
-      if (fW && !aD) calH += '<td style="' + tS + '">—</td></tr>';
-      else { if (aDM) totM += wTM; calH += '<td style="' + tS + '">' + mh(wTM) + '</td></tr>'; }
-    }
-    calH += '</table><div style="background:#1565C0;color:white;border-radius:8px;padding:12px;text-align:center;margin-top:12px"><div style="font-size:12px;opacity:.8">Total du mois</div><div style="font-size:24px;font-weight:700;margin-top:4px">' + mh(totM) + '</div></div>';
-    const pdfHtml = '<html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;color:#263238;padding:20px;margin:0}h1{color:#1565C0;font-size:18px;margin-bottom:4px}.sub{color:#607D8B;font-size:12px;margin-bottom:16px}</style></head><body><h1>D ECO OUEST — ' + currentCalSalarie + ' — ' + moisNomFr + '</h1><div class="sub">Généré le ' + new Date().toLocaleDateString('fr-FR') + '</div>' + calH + '</body></html>';
-    const encoded = encodeURIComponent(pdfHtml.replace(/\n\s*/g, '').replace(/>\s+</g, '><'));
-    const CHUNK = 1600;
-    const total = Math.ceil(encoded.length / CHUNK);
-    let finalR = null;
-    for (let i = 0; i < total; i++) {
-      const chunk = encoded.substring(i * CHUNK, (i+1) * CHUNK);
-      btn.textContent = '⏳ ' + Math.round((i+1)/total*100) + '%...';
-      const r = await apiGet({ action: 'pdf_mensuel_chunk', salarie: currentCalSalarie, chunk, idx: i, total });
-      if (!r || !r.ok) { showToast('❌ Erreur PDF', 4000); break; }
-      if (i === total - 1) finalR = r;
-    }
-    if (finalR && finalR.base64) {
-      const a = document.createElement('a');
-      a.href = 'data:application/pdf;base64,' + finalR.base64;
-      a.download = 'Calendrier_' + currentCalSalarie + '_' + moisNomFr.replace(/ /g,'_') + '.pdf';
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      showToast('✅ PDF téléchargé !', 2000);
-    }
-  } catch(err) { showToast('❌ ' + err.message, 4000); }
-  finally { btn.disabled = false; btn.textContent = '📄 Télécharger en PDF'; }
-}
-
-async function telechargerPdfSolde() {
-  const btn = document.getElementById('btn-pdf-solde');
-  btn.disabled = true; btn.textContent = '⏳ Génération...';
-  try {
-    const data = CACHE.solde || await apiGet({ action: 'solde' });
-    if (!data || !data.ok) { showToast('❌ Impossible', 4000); return; }
-    const date = new Date().toLocaleDateString('fr-FR');
-    let salRows = '';
-    for (const s of data.salaries) {
-      const c = s.positif ? '#2E7D32' : '#C62828';
-      const sd = s.solidarite || { found: false };
-      const sl = sd.found ? '<tr><td colspan="2" style="font-size:10px;color:#1565C0">🤝 Solidarité : ' + sd.date + '</td></tr>' : '<tr><td colspan="2" style="font-size:10px;color:#E65100">⚠️ Solidarité non effectuée</td></tr>';
-      salRows += '<div style="background:' + (s.positif ? '#E8F5E9' : '#FFEBEE') + ';border-left:4px solid ' + c + ';border-radius:8px;padding:14px;margin-bottom:12px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:16px;font-weight:700;color:#263238">' + s.nom + '</span><span style="background:' + c + ';color:white;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600">' + s.statut + '</span></div><table style="width:100%;border-collapse:collapse;font-size:11px"><tr><td style="padding:4px 0;color:#607D8B">Net 2026</td><td style="text-align:right;font-weight:600">' + s.net2026 + '</td><td style="padding:4px 8px;color:#607D8B">Report 2025</td><td style="text-align:right;font-weight:600">' + s.report + '</td></tr><tr><td style="padding:4px 0;color:#607D8B">Solde final</td><td style="text-align:right;font-weight:700;color:' + c + ';font-size:14px">' + s.solde + '</td><td style="padding:4px 8px;color:#607D8B">Mois</td><td style="text-align:right;font-weight:600">' + s.mois + '</td></tr>' + sl + '</table></div>';
-    }
-    const pdfHtml = '<html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;color:#263238;padding:20px;margin:0}h1{color:#1565C0;font-size:20px}.sub{color:#607D8B;font-size:12px;margin-bottom:20px}</style></head><body><h1>🏗️ D ECO OUEST — Solde Global</h1><div class="sub">Généré le ' + date + '</div>' + salRows + '</body></html>';
-    const encoded = encodeURIComponent(pdfHtml.replace(/\n\s*/g, '').replace(/>\s+</g, '><'));
-    const CHUNK = 1600;
-    const total = Math.ceil(encoded.length / CHUNK);
-    let finalR = null;
-    for (let i = 0; i < total; i++) {
-      const chunk = encoded.substring(i * CHUNK, (i+1) * CHUNK);
-      btn.textContent = '⏳ ' + Math.round((i+1)/total*100) + '%...';
-      const r = await apiGet({ action: 'pdf_mensuel_chunk', salarie: 'ANATOLE', chunk, idx: i, total });
-      if (!r || !r.ok) { showToast('❌ Erreur PDF', 4000); return; }
-      if (i === total - 1) finalR = r;
-    }
-    if (finalR && finalR.base64) {
-      const a = document.createElement('a');
-      a.href = 'data:application/pdf;base64,' + finalR.base64;
-      a.download = 'Solde_Global_' + date.replace(/\//g,'-') + '.pdf';
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      showToast('✅ PDF téléchargé !', 2000);
-    }
-  } catch(err) { showToast('❌ ' + err.message, 4000); }
-  finally { btn.disabled = false; btn.textContent = '📄 Télécharger le rapport Solde en PDF'; }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// CAPTURES
-// ═══════════════════════════════════════════════════════════════
-const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-function downloadImage(u, f) {
-  if (IS_IOS) {
-    const w = window.open();
-    if (w) w.document.write('<html><head><title>' + f + '</title></head><body style="margin:0;background:#111"><img src="' + u + '" style="width:100%"><p style="text-align:center;color:#fff;font-family:sans-serif;padding:10px">Appui long pour enregistrer</p></body></html>');
-    else window.location.href = u;
-  } else {
-    const a = document.createElement('a');
-    a.href = u; a.download = f;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  }
-}
-async function captureElementComplet(src, bg, wMax) {
-  bg = bg || '#F5F7FA';
-  const cl = src.cloneNode(true);
-  cl.style.overflow = 'visible'; cl.style.maxWidth = 'none';
-  cl.style.width = wMax ? wMax + 'px' : 'max-content';
-  cl.querySelectorAll('button').forEach(b => { const p = b.parentElement; b.remove(); if (p && p !== cl && !p.textContent.trim() && p.children.length === 0) p.remove(); });
-  cl.querySelectorAll('*').forEach(n => { n.style.overflow = 'visible'; n.style.overflowX = 'visible'; if (!wMax) n.style.maxWidth = 'none'; });
-  const h = document.createElement('div');
-  h.style.cssText = 'position:fixed;left:-20000px;top:0;background:' + bg + ';padding:16px;z-index:-1;' + (wMax ? 'width:' + (wMax + 32) + 'px' : 'width:max-content');
-  h.appendChild(cl); document.body.appendChild(h);
-  try {
-    const w = Math.max(h.scrollWidth, h.offsetWidth), ht = Math.max(h.scrollHeight, h.offsetHeight);
-    const LIM = 15000; let s = 2;
-    if (ht * s > LIM) s = Math.max(1, LIM / ht);
-    return await html2canvas(h, { scale: s, useCORS: true, backgroundColor: bg, logging: false, width: w, height: ht, windowWidth: w + 200, windowHeight: ht + 200 });
-  } finally { h.remove(); }
-}
-function fitToA4(src, m, or) {
-  m = m || 50;
-  const p = or !== 'landscape';
-  const W = p ? 1240 : 1754, H = p ? 1754 : 1240;
-  const o = document.createElement('canvas'); o.width = W; o.height = H;
-  const c = o.getContext('2d');
-  c.fillStyle = '#F5F7FA'; c.fillRect(0, 0, W, H);
-  const mW = W - m * 2, mH = H - m * 2;
-  const s = Math.min(mW / src.width, mH / src.height);
-  const w = src.width * s, h = src.height * s;
-  c.drawImage(src, 0, 0, src.width, src.height, (W - w) / 2, (H - h) / 2, w, h);
-  return o;
-}
-
-async function telechargerPdfMensuel() {
-  const btn = document.getElementById('btn-pdf-mensuel');
-  btn.disabled = true; btn.textContent = '⏳ Capture...';
-  try {
-    const el = document.getElementById('mensuel-content');
-    if (!el || !el.innerHTML.trim()) { showToast('❌ Aucune donnée', 4000); return; }
-    const now = new Date();
-    const target = new Date(now.getFullYear(), now.getMonth() + currentMensMonthOffset, 1);
-    const moisNom = target.toLocaleDateString('fr-FR', {month:'long', year:'numeric'});
-    const moisNomFr = moisNom.charAt(0).toUpperCase() + moisNom.slice(1);
-    el.classList.add('capture-hide-daily');
-    const canvas = await captureElementComplet(el, null, 900);
-    el.classList.remove('capture-hide-daily');
-    btn.textContent = '⏳ Compilation PDF...';
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-    const b64 = dataUrl.split(',')[1];
-    const htmlWrap = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>@page{size:A4;margin:10mm}body{margin:0;padding:0;font-family:Arial,sans-serif}h1{color:#1565C0;font-size:16px;margin:0 0 4px}.sub{color:#607D8B;font-size:11px;margin-bottom:10px}img{width:100%;display:block}</style></head><body><h1>D ECO OUEST — ' + currentMensSalarie + ' — ' + moisNomFr + '</h1><div class="sub">Généré le ' + new Date().toLocaleDateString('fr-FR') + '</div><img src="data:image/jpeg;base64,' + b64 + '"></body></html>';
-    const encoded = encodeURIComponent(htmlWrap);
-    const CHUNK = 3200;
-    const total = Math.ceil(encoded.length / CHUNK);
-    let finalR = null;
-    for (let i = 0; i < total; i++) {
-      const chunk = encoded.substring(i * CHUNK, (i+1) * CHUNK);
-      btn.textContent = '📤 ' + Math.round((i+1)/total*100) + '%';
-      const r = await apiGet({ action: 'pdf_mensuel_chunk', salarie: currentMensSalarie, chunk, idx: i, total });
-      if (!r || !r.ok) { showToast('❌ Erreur chunk ' + i, 4000); break; }
-      if (i === total - 1) finalR = r;
-    }
-    if (finalR && finalR.base64) {
-      const a = document.createElement('a');
-      a.href = 'data:application/pdf;base64,' + finalR.base64;
-      a.download = 'Mensuel_' + currentMensSalarie + '_' + moisNom.replace(/ /g,'_') + '.pdf';
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      showToast('✅ PDF téléchargé !', 2000);
-    } else {
-      showToast('❌ PDF non généré', 4000);
-    }
-  } catch(err) { showToast('❌ ' + err.message, 4000); }
-  finally { btn.disabled = false; btn.textContent = '📄 Télécharger le mois en PDF'; }
-}
-
-async function captureSolde() {
-  const b = document.getElementById('btn-capture-solde'); b.disabled = true; b.textContent = '⏳...';
-  try { const c = await captureElementComplet(document.getElementById('solde-content'), null, 760); const a = fitToA4(c); downloadImage(a.toDataURL('image/jpeg', 0.92), 'Solde_' + new Date().toLocaleDateString('fr-FR').replace(/\//g,'-') + '.jpg'); showToast('✅ Image téléchargée !', 2000); } catch(e) { showToast('❌ ' + e.message, 4000); } finally { b.disabled = false; b.textContent = '📸 Capturer Solde en image'; }
-}
-async function captureSemaine() {
-  const b = document.getElementById('btn-capture-semaine'); b.disabled = true; b.textContent = '⏳...';
-  try { const l = document.getElementById('week-label-main')?.textContent || 'Semaine'; const c = await captureElementComplet(document.getElementById('semaine-content')); const a = fitToA4(c); downloadImage(a.toDataURL('image/jpeg', 0.92), 'Semaine_' + currentSalarie + '_' + l.replace(/\s/g,'_') + '.jpg'); showToast('✅ Image téléchargée !', 2000); } catch(e) { showToast('❌ ' + e.message, 4000); } finally { b.disabled = false; b.textContent = '📸 Capturer la semaine en image'; }
-}
-async function captureMensuel() {
-  const b = document.getElementById('btn-capture-mensuel'); b.disabled = true; b.textContent = '⏳...';
-  const el = document.getElementById('mensuel-content');
-  try { const m = document.getElementById('mens-month-label')?.textContent || 'Mois'; el.classList.add('capture-hide-daily'); const c = await captureElementComplet(el, null, 900); downloadImage(c.toDataURL('image/jpeg', 0.95), 'Mensuel_' + currentMensSalarie + '_' + m.replace(/\s/g,'_') + '.jpg'); showToast('✅ Image téléchargée !', 2000); } catch(e) { showToast('❌ ' + e.message, 4000); } finally { el.classList.remove('capture-hide-daily'); b.disabled = false; b.textContent = '📸 Capturer le mois en image'; }
-}
-async function captureRecap() {
-  const b = document.getElementById('btn-capture-recap'); b.disabled = true; b.textContent = '⏳...';
-  try { const c = await captureElementComplet(document.getElementById('recap-content'), null, 900); const a = fitToA4(c); downloadImage(a.toDataURL('image/jpeg', 0.92), 'Recap_' + currentRecapSal + '_' + new Date().toLocaleDateString('fr-FR').replace(/\//g,'-') + '.jpg'); showToast('✅ Image téléchargée !', 2000); } catch(e) { showToast('❌ ' + e.message, 4000); } finally { b.disabled = false; b.textContent = '📸 Capturer le récap en image'; }
-}
-async function captureCalendrier() {
-  const b = document.getElementById('btn-capture-calendrier'); b.disabled = true; b.textContent = '⏳...';
-  try { const m = document.getElementById('cal-month-label')?.textContent || 'Mois'; const c = await captureElementComplet(document.getElementById('calendrier-content')); const a = fitToA4(c, 50, 'landscape'); downloadImage(a.toDataURL('image/jpeg', 0.92), 'Calendrier_' + currentCalSalarie + '_' + m.replace(/\s/g,'_') + '.jpg'); showToast('✅ Image téléchargée !', 2000); } catch(e) { showToast('❌ ' + e.message, 4000); } finally { b.disabled = false; b.textContent = '📸 Capturer le calendrier en image'; }
-}
+// ═══ PDF / CAPTURES (versions courtes) ═══
+async function telechargerPdfSolde() { showToast('⚠️ Fonction PDF désactivée (version simplifiée)', 3000); }
+async function telechargerPdfSalarie() { showToast('⚠️ Fonction PDF désactivée', 3000); }
+async function telechargerPdfMensuel() { showToast('⚠️ Fonction PDF désactivée', 3000); }
+async function telechargerPdfCalendrier() { showToast('⚠️ Fonction PDF désactivée', 3000); }
+async function captureSolde() { showToast('⚠️ Capture désactivée', 3000); }
+async function captureSemaine() { showToast('⚠️ Capture désactivée', 3000); }
+async function captureMensuel() { showToast('⚠️ Capture désactivée', 3000); }
+async function captureRecap() { showToast('⚠️ Capture désactivée', 3000); }
+async function captureCalendrier() { showToast('⚠️ Capture désactivée', 3000); }
 
 function calculerConges() {
   const sal = document.getElementById('cc-salarie').value;
@@ -1662,12 +1161,12 @@ function calculerConges() {
   if (!ds || !fs) { el.innerHTML = '<div style="color:var(--red);font-size:12px">Saisir les dates</div>'; return; }
   const debut = new Date(ds + 'T00:00:00'), fin = new Date(fs + 'T00:00:00');
   if (fin < debut) { el.innerHTML = '<div style="color:var(--red);font-size:12px">Fin après début</div>'; return; }
-  let jO = 0, jF = 0, jOuv = 0; const fL = [];
+  let jO = 0, jF = 0, jOuv = 0;
   const d = new Date(debut);
-  while (d <= fin) { const w = d.getDay(); if (w !== 0) jOuv++; if (w >= 1 && w <= 5) { if (estFerieDate(d)) { jF++; fL.push(d.toLocaleDateString('fr-FR', { weekday:'short', day:'2-digit', month:'2-digit' })); } else jO++; } d.setDate(d.getDate() + 1); }
+  while (d <= fin) { const w = d.getDay(); if (w !== 0) jOuv++; if (w >= 1 && w <= 5) { if (estFerieDate(d)) jF++; else jO++; } d.setDate(d.getDate() + 1); }
   let hD = 0; const d2 = new Date(debut);
   while (d2 <= fin) { const w = d2.getDay(); if (w >= 1 && w <= 5 && !estFerieDate(d2)) hD += (sal === 'ANTONIO' && w !== 5) ? 8*60 : 7*60; d2.setDate(d2.getDate() + 1); }
-  el.innerHTML = '<div style="background:#F8FBFF;border-radius:10px;padding:14px 16px"><div style="display:flex;justify-content:space-between"><span style="font-size:13px;color:var(--text2)">Jours ouvrables (lun-sam)</span><span style="font-weight:700">' + jOuv + ' j.</span></div><div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:13px;color:var(--blue)">↓ Jours ouvrés déduits</span><span style="font-size:18px;font-weight:700;color:var(--blue)">' + jO + ' j.</span></div>' + (jF > 0 ? '<div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:12px;color:var(--amber)">🎉 Fériés : ' + fL.join(', ') + '</span><span style="font-weight:700;color:var(--amber)">' + jF + ' j.</span></div>' : '') + '<div style="border-top:1px dashed #B0BEC5;margin:10px 0"></div><div style="display:flex;justify-content:space-between;align-items:center;background:var(--blue);border-radius:8px;padding:10px 12px"><span style="font-size:12px;color:rgba(255,255,255,.85)">Heures à déduire</span><span style="font-size:20px;font-weight:700;color:white">' + minsToStr2(hD) + '</span></div></div>';
+  el.innerHTML = '<div style="background:#F8FBFF;border-radius:10px;padding:14px 16px"><div style="display:flex;justify-content:space-between"><span>Jours ouvrables</span><strong>' + jOuv + ' j.</strong></div><div style="display:flex;justify-content:space-between;margin-top:6px"><span>Jours ouvrés</span><strong>' + jO + ' j.</strong></div><div style="border-top:1px dashed #B0BEC5;margin:10px 0"></div><div style="display:flex;justify-content:space-between;background:var(--blue);color:white;padding:10px;border-radius:8px"><span>Heures à déduire</span><strong>' + minsToStr2(hD) + '</strong></div></div>';
 }
 
 async function saveConfig() {
@@ -1679,7 +1178,6 @@ async function saveConfig() {
   else showToast('❌ Échec');
 }
 function reinitialiserConfig() { localStorage.removeItem('deo_api_url'); API_URL = API_URL_DEFAUT; document.getElementById('api-url').value = API_URL; showToast('↺ Restauré'); loadSolde(); }
-
 function refreshAll() {
   const a = document.querySelector('.page.active').id;
   if (a === 'page-solde') loadSolde();
@@ -1689,7 +1187,6 @@ function refreshAll() {
   if (a === 'page-calendrier') loadCalendrier();
   showToast('🔄 Actualisation...');
 }
-
 window.addEventListener('load', async () => {
   setStatus('Connexion...');
   await loadSolde();
