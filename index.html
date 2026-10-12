@@ -145,7 +145,7 @@ main{padding:16px;max-width:600px;margin:0 auto}
 .cal-cell{border-radius:8px;min-height:54px;padding:4px 4px;position:relative;display:flex;flex-direction:column}
 .cal-cell.empty{background:transparent}
 .cal-cell.out-month{opacity:.35}
-.cal-daynum{font-size:12px;font-weight:700;color:#263238;line-height:1.2}
+.cal-daynum{font-size:12px;font-weight:700;color:#263238;line-height:1.2;position:relative;z-index:3}
 .cal-extra{font-size:10px;color:#37474F;margin-top:auto;font-weight:600;line-height:1.2;overflow-wrap:anywhere}
 .cal-cell.travaille{background:var(--blue-l)}
 .cal-cell.weekend{background:var(--gray-l)}
@@ -248,15 +248,15 @@ window.addEventListener('DOMContentLoaded',()=>{if(sessionStorage.getItem('deo_a
       <div class="form-group">
         <label class="form-label">Type de journée</label>
         <div class="type-grid">
-          <button class="type-btn" onclick="selectType('Jour Travaillé')">✅ Jour Travaillé</button>
-          <button class="type-btn" onclick="selectType('CONGE')">🏖 Congé</button>
-          <button class="type-btn" onclick="selectType('RTT')">📆 RTT</button>
-          <button class="type-btn" onclick="selectType('ABSENT')">❌ Absent</button>
-          <button class="type-btn" onclick="selectType('JOUR FERIE non travaillé')">🎉 Jour Férié</button>
-          <button class="type-btn" onclick="selectType('ARRET MALADIE AVEC SUBROGATION')">🏥 Maladie (avec subrogation)</button>
-          <button class="type-btn" onclick="selectType('ARRET MALADIE SANS SUBROGATION')">🏥 Maladie (sans subrogation)</button>
-          <button class="type-btn" onclick="selectType('congé sans solde')">🚫 Congé sans solde</button>
-          <button class="type-btn" onclick="selectType('absences non rémunérées avec retenue sur salaire')">💸 Absence non rémunérée</button>
+          <button class="type-btn" onclick="selectType('Jour Travaillé', this)">✅ Jour Travaillé</button>
+          <button class="type-btn" onclick="selectType('CONGE', this)">🏖 Congé</button>
+          <button class="type-btn" onclick="selectType('RTT', this)">📆 RTT</button>
+          <button class="type-btn" onclick="selectType('ABSENT', this)">❌ Absent</button>
+          <button class="type-btn" onclick="selectType('JOUR FERIE non travaillé', this)">🎉 Jour Férié</button>
+          <button class="type-btn" onclick="selectType('ARRET MALADIE AVEC SUBROGATION', this)">🏥 Maladie (avec subrogation)</button>
+          <button class="type-btn" onclick="selectType('ARRET MALADIE SANS SUBROGATION', this)">🏥 Maladie (sans subrogation)</button>
+          <button class="type-btn" onclick="selectType('congé sans solde', this)">🚫 Congé sans solde</button>
+          <button class="type-btn" onclick="selectType('absences non rémunérées avec retenue sur salaire', this)">💸 Absence non rémunérée</button>
         </div>
       </div>
       <div id="heures-form" style="display:none">
@@ -881,10 +881,10 @@ function hideSaisie() {
   selectedDAMode = null;
   selectedPhotoBase64 = null;
 }
-function selectType(type) {
+function selectType(type, btn) {
   selectedType = type;
   document.querySelectorAll('.type-btn:not(.da-btn)').forEach(b => b.classList.remove('selected'));
-  if (event && event.target) event.target.classList.add('selected');
+  if (btn) btn.classList.add('selected');
   const isT = type === 'Jour Travaillé' || type === 'journee solidarité travaillé';
   document.getElementById('heures-form').style.display = isT ? 'block' : 'none';
   document.getElementById('da-form').style.display = isT ? 'block' : 'none';
@@ -1158,7 +1158,7 @@ function renderMensuel(jours, sal, moisNom, semainesCompletes, recupGlobal, ijss
   const aJ = (nRtt > 0) || (nFer > 0) || (nMalAvecSub > 0);
   const totPaye = (aT || aJ) ? Math.max(0, BM - dM - cM - dMal - dedDA + ijM + maM) : 0;
 
-  window.__lastMensuelArgs = [jours, sal, moisNom, semainesCompletes, recupGlobal, ijssServeur];
+  window.__lastMensuelArgs = [jours, sal, moisNom, semainesCompletes, recupGlobal, ijssServeur, currentMensMonthOffset];
   const header = sal === 'ANTONIO'
     ? '<tr><th>Date</th><th>Jour</th><th>Type</th><th>Travaillé</th><th>Écart</th><th>Total sem.</th></tr>'
     : '<tr><th>Date</th><th>Jour</th><th>Type</th><th>Travaillé</th><th>Écart</th><th>Récup.</th><th>Total sem.</th></tr>';
@@ -1412,11 +1412,22 @@ function renderCalCell(j, month) {
   else if (j.type && j.type !== '') ex = calAbbr(j.type);
   const n = natureOf(j.type || '');
   const bg = n ? n.couleur : '#F5F7FA';
-  const rqBadge = buildRemarqueBadge(j.remarque, j.date,
-    'position:absolute;top:2px;right:2px;background:#fff;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:10px;box-shadow:0 1px 3px rgba(0,0,0,.2);z-index:1');
+
+  // 📷 Photo : coin haut-droit, décalé à gauche du badge remarque (ne recouvre plus le numéro du jour)
   const imgBadge = buildImageBadge(j.photo, j.date,
-    'position:absolute;top:2px;left:2px;background:#fff;border-radius:50%;width:16px;height:16px;display:flex;align-items:center;justify-content:center;font-size:10px;box-shadow:0 1px 3px rgba(0,0,0,.2);z-index:1');
-  return '<div class="cal-cell" style="cursor:pointer;position:relative;background:' + (inM ? bg : '#F5F7FA') + ';opacity:' + (inM ? 1 : 0.4) + '" onclick="openSaisieFromCalendrier(' + JSON.stringify(j).replace(/"/g, '&quot;') + ')">'
+    'position:absolute;top:2px;right:22px;background:#fff;border:1px solid #B0BEC5;' +
+    'border-radius:50%;width:16px;height:16px;display:flex;align-items:center;' +
+    'justify-content:center;font-size:10px;box-shadow:0 1px 3px rgba(0,0,0,.2);z-index:2');
+
+  // 💬 Remarque : coin haut-droit
+  const rqBadge = buildRemarqueBadge(j.remarque, j.date,
+    'position:absolute;top:2px;right:2px;background:#fff;border:1px solid #B0BEC5;' +
+    'border-radius:50%;width:16px;height:16px;display:flex;align-items:center;' +
+    'justify-content:center;font-size:10px;box-shadow:0 1px 3px rgba(0,0,0,.2);z-index:2');
+
+  return '<div class="cal-cell" style="cursor:pointer;position:relative;background:' +
+    (inM ? bg : '#F5F7FA') + ';opacity:' + (inM ? 1 : 0.4) + '" ' +
+    'onclick="openSaisieFromCalendrier(' + JSON.stringify(j).replace(/"/g, '&quot;') + ')">'
     + imgBadge
     + rqBadge
     + '<div class="cal-daynum">' + dd + '</div><div class="cal-extra">' + ex + '</div></div>';
