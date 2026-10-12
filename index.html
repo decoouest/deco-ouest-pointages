@@ -292,11 +292,11 @@ window.addEventListener('DOMContentLoaded',()=>{if(sessionStorage.getItem('deo_a
           <img id="photo-img" style="max-width:100%;border-radius:10px;max-height:180px;object-fit:cover">
           <div style="font-size:11px;color:var(--text2);margin-top:4px" id="photo-name"></div>
         </div>
-        <label class="photo-zone">
+        <div class="photo-zone" onclick="document.getElementById('f-photo').click()">
           <span style="font-size:24px">📷</span>
           <span id="photo-label">Choisir une image</span>
-          <input type="file" id="f-photo" accept="image/*" onchange="previewPhoto(this)" style="display:none">
-        </label>
+        </div>
+        <input type="file" id="f-photo" accept="image/*" onchange="previewPhoto(this)" style="display:none">
         <div class="photo-status" id="photo-status">✓ Aperçu chargé</div>
       </div>
       <button class="btn-save" id="btn-save" onclick="sauvegarder()" disabled>Enregistrer dans Sheets</button>
@@ -776,10 +776,14 @@ function afficherRemarque(date, texte) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// PHOTO — VERSION ORIGINALE (compression + aperçu)
+// PHOTO
 // ═══════════════════════════════════════════════════════════════
 function previewPhoto(input) {
-  if (!input.files || !input.files[0]) return;
+  showToast('📷 Fichier reçu...', 1500);
+  if (!input.files || input.files.length === 0) {
+    showToast('❌ Aucun fichier', 3000);
+    return;
+  }
   const file = input.files[0];
   const reader = new FileReader();
   reader.onload = function(e) {
@@ -798,14 +802,28 @@ function previewPhoto(input) {
       const compressed = canvas.toDataURL('image/jpeg', 0.75);
       selectedPhotoBase64 = compressed.split(',')[1];
 
-      document.getElementById('photo-img').src = compressed;
-      document.getElementById('photo-preview').style.display = 'block';
-      document.getElementById('photo-label').textContent = 'Changer l\'image';
-      document.getElementById('photo-status').style.display = 'block';
+      const imgEl     = document.getElementById('photo-img');
+      const previewEl = document.getElementById('photo-preview');
+      const labelEl   = document.getElementById('photo-label');
+      const statusEl  = document.getElementById('photo-status');
+      const nameEl    = document.getElementById('photo-name');
+
+      if (imgEl)     imgEl.src = compressed;
+      if (previewEl) previewEl.style.display = 'block';
+      if (labelEl)   labelEl.textContent = 'Changer l\'image';
+      if (statusEl)  statusEl.style.display = 'block';
       const sizeKB = Math.round(selectedPhotoBase64.length * 0.75 / 1024);
-      document.getElementById('photo-name').textContent = file.name + ' · ' + sizeKB + ' Ko (compressé)';
+      if (nameEl)    nameEl.textContent = file.name + ' · ' + sizeKB + ' Ko (compressé)';
+
+      showToast('✅ Aperçu chargé', 1500);
+    };
+    img.onerror = function() {
+      showToast('❌ Image illisible', 4000);
     };
     img.src = e.target.result;
+  };
+  reader.onerror = function() {
+    showToast('❌ Impossible de lire le fichier', 4000);
   };
   reader.readAsDataURL(file);
 }
@@ -845,7 +863,6 @@ function openSaisie(jour) {
   document.getElementById('f-remarque').value = cleanRemarque(raw);
   resetPhotoForm();
 
-  // Affiche la photo existante si le jour en a une
   if (jour.photo && jour.photo.thumbUrl) {
     const imgEl   = document.getElementById('photo-img');
     const prevEl  = document.getElementById('photo-preview');
