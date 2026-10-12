@@ -286,6 +286,19 @@ window.addEventListener('DOMContentLoaded',()=>{if(sessionStorage.getItem('deo_a
         <label class="form-label">💬 Remarque / Commentaire</label>
         <textarea id="f-remarque" rows="3" placeholder="Saisir une remarque..." style="width:100%;padding:12px;border:2px solid #E0E0E0;border-radius:10px;font-size:14px;resize:vertical;font-family:inherit;outline:none;box-sizing:border-box"></textarea>
       </div>
+      <div id="photo-form" style="margin-top:12px">
+        <label class="form-label">📷 Image (colonne K)</label>
+        <div id="photo-preview" style="display:none;margin-bottom:10px;text-align:center">
+          <img id="photo-img" style="max-width:100%;border-radius:10px;max-height:180px;object-fit:cover">
+          <div style="font-size:11px;color:var(--text2);margin-top:4px" id="photo-name"></div>
+        </div>
+        <label class="photo-zone">
+          <span style="font-size:24px">📷</span>
+          <span id="photo-label">Choisir une image</span>
+          <input type="file" id="f-photo" accept="image/*" onchange="previewPhoto(this)" style="display:none">
+        </label>
+        <div class="photo-status" id="photo-status">✓ Image prête à envoyer</div>
+      </div>
       <button class="btn-save" id="btn-save" onclick="sauvegarder()" disabled>Enregistrer dans Sheets</button>
     </div>
   </div>
@@ -374,6 +387,7 @@ let API_URL = localStorage.getItem('deo_api_url') || API_URL_DEFAUT;
 const CACHE = {};
 let currentSalarie = 'ANATOLE', currentRecapSal = 'ANATOLE', currentSaisieRow = null;
 let selectedType = null, selectedDAMode = null;
+let selectedPhotoBase64 = null;
 const DA_MARKER = '[[RETENUE-DA]]';
 const COMPTEUR_MARKER = '[[COMPTEUR-DA]]';
 let currentWeekOffset = 0, currentMensSalarie = 'ANATOLE', currentMensMonthOffset = 0;
@@ -435,6 +449,25 @@ async function apiGet(p) {
   } finally { clearTimeout(t); }
 }
 
+// ⭐ apiPost : envoie la photo en 1 seule requête (rapide)
+async function apiPost(body, timeoutMs) {
+  if (!API_URL) return null;
+  const c = new AbortController();
+  const t = setTimeout(() => c.abort(), timeoutMs || 90000);
+  try {
+    const r = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(body),
+      signal: c.signal
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return await r.json();
+  } catch(e) {
+    showToast('❌ ' + (e.name === 'AbortError' ? 'Délai dépassé' : e.message), 5000);
+    return null;
+  } finally { clearTimeout(t); }
+}
 
 function setStatus(m) { const e = document.getElementById('nav-status'); if (e) e.textContent = m; }
 function showToast(m, d = 3000) { const t = document.getElementById('toast'); if (!t) { console.log('[toast]', m); return; } t.textContent = m; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), d); }
@@ -766,6 +799,51 @@ function afficherRemarque(date, texte) {
   m.style.display = 'flex';
 }
 
+// ═══════════════════════════════════════════════════════════════
+// PHOTO : compression rapide (1280px / qualité 0.75)
+// ═══════════════════════════════════════════════════════════════
+function previewPhoto(input) {
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const MAX = 1280;
+      let w = img.width, h = img.height;
+      if (w > MAX || h > MAX) {
+        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+        else       { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      const compressed = canvas.toDataURL('image/jpeg', 0.75);
+      selectedPhotoBase64 = compressed.split(',')[1];
+
+      document.getElementById('photo-img').src = compressed;
+      document.getElementById('photo-preview').style.display = 'block';
+      document.getElementById('photo-label').textContent = 'Changer l\'image';
+      document.getElementById('photo-status').style.display = 'block';
+      const sizeKB = Math.round(selectedPhotoBase64.length * 0.75 / 1024);
+      document.getElementById('photo-name').textContent = file.name + ' · ' + sizeKB + ' Ko (compressé)';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function resetPhotoForm() {
+  selectedPhotoBase64 = null;
+  const p = document.getElementById('photo-preview');
+  const s = document.getElementById('photo-status');
+  const i = document.getElementById('f-photo');
+  const l = document.getElementById('photo-label');
+  if (p) p.style.display = 'none';
+  if (s) s.style.display = 'none';
+  if (i) i.value = '';
+  if (l) l.textContent = 'Choisir une image';
+}
 
 // ═══════════════════════════════════════════════════════════════
 // SAISIE
@@ -787,6 +865,7 @@ function openSaisie(jour) {
   selectedDAMode = hasR ? 'retenue' : (hasC ? 'compteur' : null);
   document.querySelectorAll('.da-btn').forEach(b => b.classList.toggle('selected', b.dataset.mode === selectedDAMode));
   document.getElementById('f-remarque').value = cleanRemarque(raw);
+  resetPhotoForm();
   const isT = jour.type === 'Jour Travaillé' || jour.type === 'journee solidarité travaillé';
   document.getElementById('heures-form').style.display = isT ? 'block' : 'none';
   document.getElementById('da-form').style.display = isT ? 'block' : 'none';
@@ -800,6 +879,7 @@ function hideSaisie() {
   currentSaisieRow = null;
   selectedType = null;
   selectedDAMode = null;
+  selectedPhotoBase64 = null;
 }
 function selectType(type) {
   selectedType = type;
@@ -816,7 +896,7 @@ function selectDAMode(mode, btn) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// SAUVEGARDE DES HEURES (sans envoi de fichier/photo)
+// ⭐ SAUVEGARDE OPTIMISÉE (GET groupé + POST photo)
 // ═══════════════════════════════════════════════════════════════
 async function sauvegarder() {
   if (!currentSaisieRow || !selectedType) { showToast('❌ Sélectionnez un type', 4000); return; }
@@ -853,6 +933,23 @@ async function sauvegarder() {
       return;
     }
 
+    // ⭐ PHOTO : 1 SEUL appel POST (rapide)
+    let imgOk = true;
+    let imgMsg = '';
+    if (selectedPhotoBase64) {
+      btn.textContent = '📤 Envoi image...';
+      const rPhoto = await apiPost({
+        action: 'saisir_photo',
+        salarie: currentSalarie,
+        row: currentSaisieRow.row,
+        imageBase64: selectedPhotoBase64
+      }, 90000);
+      if (!rPhoto || !rPhoto.ok) {
+        imgOk = false;
+        imgMsg = rPhoto?.error || 'Échec photo';
+      }
+    }
+
     // Succès
     delete CACHE.solde;
     delete CACHE.dettesDA;
@@ -863,7 +960,13 @@ async function sauvegarder() {
     });
 
     const dt = ((Date.now() - t0) / 1000).toFixed(1);
-    showToast('✅ Enregistré (' + dt + 's)', 2500);
+    if (imgOk && selectedPhotoBase64) {
+      showToast('✅ Enregistré avec image (' + dt + 's)', 2500);
+    } else if (!imgOk) {
+      showToast('⚠️ Enregistré SANS image : ' + imgMsg, 6000);
+    } else {
+      showToast('✅ Enregistré (' + dt + 's)', 2500);
+    }
     hideSaisie();
     loadSemaine(currentSalarie);
 
