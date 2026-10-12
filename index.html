@@ -113,7 +113,6 @@ main{padding:16px;max-width:600px;margin:0 auto}
 .mens-table tr.ferie td{background:#FFF9C4}
 .mens-table td.ecart-pos{color:#1B5E20;font-weight:600}
 .mens-table td.ecart-neg{color:#B71C1C;font-weight:600}
-.capture-hide-daily .mens-trav-col,.capture-hide-daily .mens-ecart-col{visibility:hidden}
 .mens-table tr.semaine-total td{background:var(--blue-l);font-weight:700;font-size:11px;border-top:2px solid var(--blue);border-bottom:2px solid var(--blue);padding:7px 4px}
 .mens-table tr.semaine-total td.fort{background:var(--blue);color:#fff}
 .mens-table tr.semaine-total.sem-ok td{background:var(--green-l);border-top:2px solid var(--green);border-bottom:2px solid var(--green)}
@@ -128,14 +127,6 @@ main{padding:16px;max-width:600px;margin:0 auto}
 .tooltip-nature{position:relative;display:inline-block;cursor:help}
 .tooltip-nature .tooltip-box{display:none;position:absolute;left:50%;transform:translateX(-50%);bottom:calc(100% + 6px);background:#263238;color:white;border-radius:8px;padding:10px 12px;font-size:10px;white-space:nowrap;z-index:999;min-width:180px}
 .tooltip-nature:hover .tooltip-box{display:block}
-.audit-panel{display:none;background:#E8F5E9;border:1px solid var(--green);border-radius:8px;padding:12px;margin:4px 0 8px;font-size:11px}
-.audit-panel.open{display:block}
-.audit-panel table{width:100%;border-collapse:collapse}
-.audit-panel td{padding:4px 8px;border-bottom:1px solid #C8E6C9}
-.audit-panel td:first-child{color:var(--text2);font-weight:600}
-.audit-panel td:last-child{font-weight:700;text-align:right}
-.audit-panel .audit-ok{color:var(--green);font-weight:700}
-.mens-table tr.semaine-detail td{background:#F8FBFF;font-size:10px;color:var(--text2);text-align:left;padding:4px 8px;border-bottom:2px solid var(--blue);font-style:italic}
 .cal-total-head{font-size:11px;font-weight:700;color:var(--blue);text-align:center;padding:4px 6px;background:var(--blue-l);border-radius:8px;white-space:nowrap}
 .cal-total-cell{background:var(--blue);border-radius:8px;min-height:54px;padding:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;min-width:44px;width:44px}
 .cal-total-mois{background:var(--blue);color:white;border-radius:10px;padding:10px 16px;text-align:center;margin-top:8px}
@@ -147,18 +138,9 @@ main{padding:16px;max-width:600px;margin:0 auto}
 .cal-cell.out-month{opacity:.35}
 .cal-daynum{font-size:12px;font-weight:700;color:#263238;line-height:1.2}
 .cal-extra{font-size:10px;color:#37474F;margin-top:auto;font-weight:600;line-height:1.2;overflow-wrap:anywhere}
-.cal-cell.travaille{background:var(--blue-l)}
-.cal-cell.weekend{background:var(--gray-l)}
-.cal-cell.conge{background:#E8F5E9}
-.cal-cell.absent{background:var(--red-l)}
-.cal-cell.rtt{background:#F3E5F5}
-.cal-cell.ferie{background:#FFF9C4}
-.cal-legend{display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:var(--text2)}
-.cal-legend span{display:flex;align-items:center;gap:4px}
 .rq-hint{position:relative;display:inline-block;cursor:pointer}
 .rq-hint::after{content:attr(data-rq);display:none;position:absolute;left:50%;transform:translateX(-50%);bottom:calc(100% + 8px);background:#263238;color:#fff;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:400;white-space:pre-wrap;width:max-content;max-width:240px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.3);line-height:1.4;text-align:left;pointer-events:none}
 .rq-hint:hover::after{display:block}
-.rq-hint.rq-down::after{bottom:auto;top:calc(100% + 6px)}
 .img-hint{position:relative;display:inline-block;cursor:pointer}
 .img-hint .img-pop{display:none;position:absolute;right:0;bottom:calc(100% + 8px);background:#fff;border:2px solid var(--blue);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.35);z-index:99999;padding:6px;width:260px;text-align:center}
 .img-hint .img-pop img{width:100%;border-radius:6px;display:block;max-height:200px;object-fit:cover}
@@ -167,7 +149,6 @@ main{padding:16px;max-width:600px;margin:0 auto}
 .photo-zone{display:flex;align-items:center;justify-content:center;gap:10px;background:var(--gray-l);border:2px dashed #B0BEC5;border-radius:10px;padding:16px;cursor:pointer;font-size:14px;color:var(--text2)}
 .photo-status{display:none;margin-top:8px;padding:8px 10px;background:var(--green-l);border-radius:8px;font-size:12px;color:var(--green);font-weight:600}
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
 </head>
 <body>
 
@@ -454,7 +435,7 @@ function buildImageBadge(photo, date, style) {
   const url = photo.thumbUrl;
   const viewUrl = photo.viewUrl || url;
   const extraStyle = style ? ';' + style : '';
-  return '<span class="img-hint" style="display:inline-block;vertical-align:middle' + extraStyle + '"><span title="Cliquer pour voir la photo HD" onclick="event.stopPropagation(); window.open(\'' + viewUrl + '\',\'_blank\')">📷</span><span class="img-pop"><img src="' + url + '" alt="Photo ' + date + '" loading="lazy"><div class="legende">' + date + ' — cliquer pour la HD</div></span></span>';
+  return '<span class="img-hint" style="display:inline-block;vertical-align:middle' + extraStyle + '"><span title="Voir la photo HD" onclick="event.stopPropagation(); window.open(\'' + viewUrl + '\',\'_blank\')">📷</span><span class="img-pop"><img src="' + url + '" loading="lazy"><div class="legende">' + date + '</div></span></span>';
 }
 
 const NATURE = {
@@ -505,15 +486,16 @@ function buildTooltip(t) {
   const n = natureOf(t);
   if (!n || t === 'week end') return '';
   const r = (l, v) => '<tr><td>' + l + '</td><td>' + (v ? '✅' : '❌') + '</td></tr>';
-  return '<span class="tooltip-nature">' + n.icone + ' ' + n.label + '<div class="tooltip-box"><strong style="font-size:11px">' + n.label + '</strong><table style="margin-top:6px">' + r('Travail effectif', n.trav) + r('Heures assimilées', n.assim) + r('Payé employeur', n.paye) + '</table></div></span>';
+  return '<span class="tooltip-nature">' + n.icone + ' ' + n.label + '<div class="tooltip-box"><strong>' + n.label + '</strong><table style="margin-top:6px">' + r('Travail', n.trav) + r('Assimilé', n.assim) + r('Payé', n.paye) + '</table></div></span>';
 }
 
 // ═══ SOLDE ═══
 async function loadSolde() {
   const el = document.getElementById('solde-content');
   if (!API_URL) { el.innerHTML = '<div class="card"><div class="empty">⚙️ Configurez l\'URL</div></div>'; return; }
+  el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Chargement...</div></div>';
   const data = await apiGet({ action: 'solde' });
-  if (!data || data.error) { setStatus('Non connecté'); el.innerHTML = '<div class="alerte danger">❌ ' + (data?.error || 'Erreur') + '</div>'; return; }
+  if (!data || data.error) { setStatus('Erreur'); el.innerHTML = '<div class="alerte danger">❌ ' + (data?.error || 'Erreur') + '</div>'; return; }
   CACHE.solde = data;
   let html = '';
   for (const s of data.salaries) {
@@ -527,8 +509,6 @@ async function loadSolde() {
       + '<div class="solde-item"><div class="solde-item-label">Solde final</div><div class="solde-item-val ' + (s.positif ? 'positif' : 'negatif') + '">' + s.solde + '</div></div>'
       + '</div>' + solHtml + '</div>';
   }
-  const d = new Date(data.timestamp);
-  html += '<div style="text-align:center;font-size:11px;color:var(--text2);margin-top:8px">Sync : ' + d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) + '</div>';
   el.innerHTML = html;
   setStatus('Connecté');
 }
@@ -756,10 +736,150 @@ async function sauvegarder() {
   }
 }
 
-// ═══ MENSUEL / RÉCAP / CALENDRIER (placeholders) ═══
-async function loadMensuel() { document.getElementById('mensuel-content').innerHTML = '<div class="empty">Module mensuel en cours de restauration</div>'; }
-async function loadRecap(sal) { document.getElementById('recap-content').innerHTML = '<div class="empty">Module récap en cours de restauration</div>'; }
-async function loadCalendrier() { document.getElementById('calendrier-content').innerHTML = '<div class="empty">Module calendrier en cours de restauration</div>'; }
+// ═══ MENSUEL ═══
+async function loadMensuel() {
+  const myToken = ++mensuelLoadToken;
+  const sal = currentMensSalarie, offset = currentMensMonthOffset;
+  const el = document.getElementById('mensuel-content');
+  if (!API_URL) { el.innerHTML = '<div class="empty">⚙️ Configurez l\'URL</div>'; return; }
+  const ck = 'mensuel_' + sal + '_' + offset;
+  const cached = CACHE[ck];
+  if (cached && cached.mois) {
+    const mn = traduireMois(cached.nomMois || '');
+    document.getElementById('mens-month-label').textContent = mn.charAt(0).toUpperCase() + mn.slice(1);
+    try { renderMensuel(cached.mois, sal, mn, cached.semainesCompletes, cached.recupGlobal, cached.ijssServeur); } catch(e) {}
+  } else el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Chargement...</div></div>';
+  const [d, dS, dR, dI] = await Promise.all([
+    apiGet({ action: 'mois', salarie: sal, offset }),
+    apiGet({ action: 'moisCalendrier', salarie: sal, offset }),
+    apiGet({ action: 'recuperation', salarie: sal }),
+    apiGet({ action: 'ijss', salarie: sal, offset })
+  ]);
+  if (myToken !== mensuelLoadToken || sal !== currentMensSalarie || offset !== currentMensMonthOffset) return;
+  if (!d || !d.ok) { if (!cached) el.innerHTML = '<div class="empty">❌ ' + (d?.error || 'Erreur') + '</div>'; return; }
+  const mn = traduireMois(d.nomMois || '');
+  document.getElementById('mens-month-label').textContent = mn.charAt(0).toUpperCase() + mn.slice(1);
+  if (!d.mois || !d.mois.length) { if (!cached) el.innerHTML = '<div class="empty">📅 Aucune donnée</div>'; return; }
+  const sc = (dS && dS.ok) ? dS.semaines : null;
+  const rg = (dR && dR.ok) ? dR : null;
+  const is = (dI && dI.ok) ? dI : null;
+  CACHE[ck] = Object.assign({}, d, { semainesCompletes: sc, recupGlobal: rg, ijssServeur: is });
+  try { renderMensuel(d.mois, sal, mn, sc, rg, is); } catch(e) { el.innerHTML = '<div class="empty">❌ ' + e.message + '</div>'; }
+}
+function renderMensuel(jours, sal, moisNom, semainesCompletes, recupGlobal, ijssServeur) {
+  const el = document.getElementById('mensuel-content');
+  const pd = s => { const [dd, mm, yy] = s.split('/').map(Number); return new Date(yy, mm-1, dd); };
+  const lundiDe = d => { const j = (d.getDay()+6)%7; const l = new Date(d); l.setDate(d.getDate()-j); return l; };
+  const baseJ = d => (sal === 'ANTONIO' && d.getDay() !== 5) ? 8*60 : 7*60;
+  const parseDur = s => { if (!s || s === '' || s === '0:00' || s === '0:00:00') return 0; const n = s.startsWith('-'); const c = s.replace('-',''); const p = c.split(':'); const m = (parseInt(p[0])||0)*60+(parseInt(p[1])||0); return n ? -m : m; };
+  const semaines = {};
+  for (const j of jours) { const k = lundiDe(pd(j.date)).getTime(); if (!semaines[k]) semaines[k] = []; semaines[k].push(j); }
+  const moisAff = jours.length ? pd(jours[0].date).getMonth() : null;
+  const pad2 = n => String(n).padStart(2,'0');
+  let rows = '';
+  for (const k of Object.keys(semaines).map(Number).sort((a,b) => a-b)) {
+    const js = semaines[k];
+    let wTrav = 0, wBase = 0;
+    for (const j of js) {
+      const t = j.type || '';
+      const dL = pd(j.date);
+      const isT = t === 'Jour Travaillé' || t === 'journee solidarité travaillé';
+      const dJ = pd(j.date);
+      if (dJ.getDay() !== 0 && dJ.getDay() !== 6) {
+        const bj = baseJ(dJ);
+        if (isT && j.travaille) wTrav += parseDur(j.travaille);
+        if (estAssimile(t)) wBase += bj;
+        else if (!estNeutralise(t) && t !== 'week end') wBase += bj;
+      }
+      const [dd, mm] = j.date.split('/');
+      const jc = j.jour ? j.jour.substring(0,3) : '';
+      const tS = isT && j.travaille ? cleanTime(j.travaille) : '—';
+      const eS = isT && j.ecart && j.ecart !== '0:00' ? cleanTime(j.ecart) : '—';
+      rows += '<tr class="' + typeToClass(t) + '"><td><strong>' + dd + '/' + mm + '</strong></td><td>' + jc + '</td><td style="font-size:9px">' + typeLabelCourt(t) + '</td><td>' + tS + '</td><td>' + eS + '</td></tr>';
+    }
+    const l = new Date(k), fs = new Date(k); fs.setDate(fs.getDate()+6);
+    const f = d => pad2(d.getDate())+'/'+pad2(d.getMonth()+1);
+    rows += '<tr class="semaine-total sem-ok"><td colspan="3" style="text-align:left">▶ Sem. ' + f(l) + ' → ' + f(fs) + '</td><td>' + minsToStr2(wTrav) + '</td><td class="fort">' + minsToStr2(wBase) + '</td></tr>';
+  }
+  const BM = Math.round((sal === 'ANTONIO' ? 39 : 35) * 52 / 12 * 60);
+  let html = '<div class="card" style="overflow-x:auto"><div style="display:flex;justify-content:space-between;margin-bottom:10px"><span style="font-weight:700;font-size:15px;color:var(--blue)">' + sal + '</span><span style="font-weight:600;color:var(--text2)">' + moisNom.charAt(0).toUpperCase() + moisNom.slice(1) + '</span></div><table class="mens-table"><tr><th>Date</th><th>Jour</th><th>Type</th><th>Travaillé</th><th>Écart</th></tr>' + rows + '</table></div>';
+  html += '<div class="card" style="margin-top:10px;border-left:4px solid var(--blue)"><div class="card-title" style="color:var(--blue)">💰 Base mensuelle</div><div style="display:flex;justify-content:space-between"><span>Base théorique</span><strong style="color:var(--blue);font-size:18px">' + minsToStr2(BM) + '</strong></div></div>';
+  el.innerHTML = html;
+}
+
+// ═══ RÉCAP ═══
+async function loadRecap(sal) {
+  const myToken = ++recapLoadToken;
+  const el = document.getElementById('recap-content');
+  if (!API_URL) { el.innerHTML = '<div class="empty">⚙️ Configurez l\'URL</div>'; return; }
+  const ck = 'recap_' + sal;
+  const cached = CACHE[ck];
+  if (cached) { try { renderRecap(sal, cached.data); } catch(e) {} }
+  else el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Chargement...</div></div>';
+  const d = await apiGet({ action: 'recap', salarie: sal });
+  if (myToken !== recapLoadToken || sal !== currentRecapSal) return;
+  if (!d || d.error) { if (!cached) el.innerHTML = '<div class="empty">❌ ' + (d?.error || 'Erreur') + '</div>'; return; }
+  CACHE[ck] = { data: d };
+  renderRecap(sal, d);
+}
+function renderRecap(sal, data) {
+  const el = document.getElementById('recap-content');
+  const isA = data.isAntonio || sal === 'ANTONIO';
+  let html = '<div class="card" style="text-align:center"><div style="font-size:16px;font-weight:700;color:var(--blue)">' + sal + '</div><div style="font-size:11px;color:var(--text2);text-transform:uppercase">Récap annuel 2026</div></div>';
+  html += '<div class="card" style="overflow-x:auto"><table class="recap-table"><thead><tr>';
+  if (!isA) html += '<th>Mois</th><th>H.Sup Maj.</th><th>J.RTT</th><th>J.Abs</th><th>Congés</th>';
+  else html += '<th>Mois</th><th>J.Abs</th><th>H.Abs</th><th>J.W-E</th><th>H.W-E</th><th>Congés</th>';
+  html += '</tr></thead><tbody>';
+  for (const m of data.mois) {
+    html += '<tr>';
+    if (!isA) html += '<td><strong>' + m.mois + '</strong></td><td>' + (m.hSupMaj || '—') + '</td><td>' + (m.jRtt > 0 ? m.jRtt + 'j' : '—') + '</td><td>' + (m.jAbsent > 0 ? m.jAbsent + 'j' : '—') + '</td><td>' + (m.conges > 0 ? m.conges + 'j' : '—') + '</td>';
+    else html += '<td><strong>' + m.mois + '</strong></td><td>' + (m.jAbsent > 0 ? m.jAbsent + 'j' : '—') + '</td><td>' + (m.hAbsent && m.hAbsent !== '0:00' ? m.hAbsent : '—') + '</td><td>' + (m.jWeTrav > 0 ? m.jWeTrav + 'j' : '—') + '</td><td>' + (m.hWeTrav && m.hWeTrav !== '0:00' ? m.hWeTrav : '—') + '</td><td>' + (m.conges > 0 ? m.conges + 'j' : '—') + '</td>';
+    html += '</tr>';
+  }
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+}
+
+// ═══ CALENDRIER ═══
+async function loadCalendrier() {
+  const myToken = ++calLoadToken;
+  const el = document.getElementById('calendrier-content');
+  if (!API_URL) { el.innerHTML = '<div class="empty">⚙️ Configurez l\'URL</div>'; return; }
+  const now = new Date();
+  const target = new Date(now.getFullYear(), now.getMonth() + currentCalMonthOffset, 1);
+  const month = target.getMonth();
+  document.getElementById('cal-month-label').textContent = traduireMois(target.toLocaleDateString('en-US', {month:'long', year:'numeric'}));
+  el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Chargement...</div></div>';
+  const ck = 'cal_' + currentCalSalarie + '_' + currentCalMonthOffset;
+  let data = CACHE[ck];
+  if (!data) { data = await apiGet({ action: 'moisCalendrier', salarie: currentCalSalarie, offset: currentCalMonthOffset }); if (data && data.ok) CACHE[ck] = data; }
+  if (myToken !== calLoadToken) return;
+  if (!data || !data.ok) { el.innerHTML = '<div class="empty">❌ ' + (data?.error || 'Erreur') + '</div>'; return; }
+  const wd = data.semaines.map(s => ({ monday: new Date(s.monday + 'T00:00:00'), jours: s.jours || [] }));
+  renderCalendrier(wd, month);
+}
+function renderCalendrier(weeksData, month) {
+  const jn = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
+  const ml = document.getElementById('cal-month-label')?.textContent || '';
+  let html = '<div class="card"><div style="text-align:center;margin-bottom:10px"><div style="font-size:16px;font-weight:700;color:var(--blue)">' + currentCalSalarie + '</div><div style="font-size:12px;color:var(--text2)">' + ml + '</div></div>';
+  html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">';
+  for (const j of jn) html += '<div class="cal-head">' + j + '</div>';
+  for (const week of weeksData) {
+    for (let i = 0; i < 7; i++) {
+      const dt = new Date(week.monday); dt.setDate(dt.getDate() + i);
+      const inM = dt.getMonth() === month;
+      const fW = estFerieDate(dt);
+      const j = week.jours[i];
+      let bg = '#F5F7FA';
+      let extra = '';
+      if (j && j.type) { bg = natureOf(j.type).couleur; extra = (j.type === 'Jour Travaillé' && j.travaille) ? cleanTime(j.travaille) : calAbbr(j.type); }
+      else if (fW) { bg = '#FFF9C4'; extra = '🎉'; }
+      html += '<div class="cal-cell" style="background:' + bg + ';opacity:' + (inM ? 1 : 0.4) + '"><div class="cal-daynum">' + dt.getDate() + '</div><div class="cal-extra">' + extra + '</div></div>';
+    }
+  }
+  html += '</div></div>';
+  document.getElementById('calendrier-content').innerHTML = html;
+}
 
 // ═══ CONFIG ═══
 async function saveConfig() {
