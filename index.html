@@ -192,7 +192,7 @@ async function checkLogin(){
   if(h==='a6f758aec5ac8a4565838d776ec32f4a4e7ff043746647885e295a898d1eaf97'){document.getElementById('login-screen').style.display='none';sessionStorage.setItem('deo_auth','1');}
   else{e.style.display='block';i.value='';i.focus();}
 }
-window.addEventListener('DOMContentLoaded',()=>{if(sessionStorage.getItem('deo_auth')==='1')document.getElementById('login-screen').style.display='none';else setTimeout(()=>document.getElementById('login-input').focus(),100);});
+window.addEventListener('DOMContentLoaded',function(){if(sessionStorage.getItem('deo_auth')==='1')document.getElementById('login-screen').style.display='none';else setTimeout(function(){document.getElementById('login-input').focus();},100);});
 </script>
 
 <nav>
@@ -287,7 +287,7 @@ window.addEventListener('DOMContentLoaded',()=>{if(sessionStorage.getItem('deo_a
         <textarea id="f-remarque" rows="3" placeholder="Saisir une remarque..." style="width:100%;padding:12px;border:2px solid #E0E0E0;border-radius:10px;font-size:14px;resize:vertical;font-family:inherit;outline:none;box-sizing:border-box"></textarea>
       </div>
       <div id="photo-form" style="margin-top:12px">
-        <label class="form-label">📷 Image (aperçu local uniquement)</label>
+        <label class="form-label">📷 Aperçu photo (optionnel)</label>
         <div id="photo-preview" style="display:none;margin-bottom:10px;text-align:center">
           <img id="photo-img" style="max-width:100%;border-radius:10px;max-height:180px;object-fit:cover">
           <div style="font-size:11px;color:var(--text2);margin-top:4px" id="photo-name"></div>
@@ -445,25 +445,6 @@ async function apiGet(p) {
     return await r.json();
   } catch(e) {
     showToast('❌ ' + (e.name === 'AbortError' ? 'Délai dépassé' : e.message), 4000);
-    return null;
-  } finally { clearTimeout(t); }
-}
-
-async function apiPost(body, timeoutMs) {
-  if (!API_URL) return null;
-  const c = new AbortController();
-  const t = setTimeout(() => c.abort(), timeoutMs || 90000);
-  try {
-    const r = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(body),
-      signal: c.signal
-    });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return await r.json();
-  } catch(e) {
-    showToast('❌ ' + (e.name === 'AbortError' ? 'Délai dépassé' : e.message), 5000);
     return null;
   } finally { clearTimeout(t); }
 }
@@ -633,7 +614,7 @@ async function loadSolde() {
   else el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Lecture du Sheets...</div></div>';
   const data = await apiGet({ action: 'solde' });
   if (!data || data.error) {
-    if (!hasCache) { setStatus(data ? 'Erreur script' : 'Non connecté'); el.innerHTML = '<div class="alerte danger">❌ ' + (data?.error || 'Erreur de connexion') + '</div>'; }
+    if (!hasCache) { setStatus(data ? 'Erreur script' : 'Non connecté'); el.innerHTML = '<div class="alerte danger">❌ ' + (data && data.error ? data.error : 'Erreur de connexion') + '</div>'; }
     return;
   }
   CACHE.solde = data;
@@ -727,7 +708,8 @@ async function loadSemaine(sal) {
   try { renderSemaine(data.semaine, sal); } catch(e) { el.innerHTML = '<div class="empty">❌ ' + e.message + '</div>'; }
 }
 
-function renderSemaine(jours, sal = currentSalarie) {
+function renderSemaine(jours, sal) {
+  if (!sal) sal = currentSalarie;
   const el = document.getElementById('semaine-content');
   const parseDur = s => { if (!s || s === '' || s === '0:00') return 0; const n = s.startsWith('-'); const c = s.replace('-',''); const p = c.split(':'); const m = (parseInt(p[0])||0)*60+(parseInt(p[1])||0); return n ? -m : m; };
   const minToStr = m => { const n = m<0, a = Math.abs(m); return (n?'-':'')+Math.floor(a/60)+':'+String(a%60).padStart(2,'0'); };
@@ -796,25 +778,17 @@ function afficherRemarque(date, texte) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// PHOTO (aperçu local uniquement)
+// PHOTO — aperçu local uniquement
 // ═══════════════════════════════════════════════════════════════
 function previewPhoto(input) {
-  console.log('[previewPhoto] déclenchée');
-  if (!input.files || input.files.length === 0) {
-    console.log('[previewPhoto] aucun fichier');
-    return;
-  }
+  if (!input.files || input.files.length === 0) return;
   const file = input.files[0];
-  console.log('[previewPhoto] fichier:', file.name, file.type, file.size);
-
   if (!file.type || file.type.indexOf('image/') !== 0) {
     showToast('❌ Sélectionnez une image (JPG, PNG...)', 4000);
     return;
   }
-
   const reader = new FileReader();
   reader.onload = function(e) {
-    console.log('[previewPhoto] lecture OK, taille =', e.target.result.length);
     const img     = document.getElementById('photo-img');
     const preview = document.getElementById('photo-preview');
     const label   = document.getElementById('photo-label');
@@ -827,10 +801,7 @@ function previewPhoto(input) {
     if (name)    name.textContent = file.name + ' (' + Math.round(file.size / 1024) + ' Ko)';
     showToast('✅ Aperçu chargé', 1500);
   };
-  reader.onerror = function(e) {
-    console.error('[previewPhoto] ERREUR lecture:', e);
-    showToast('❌ Impossible de lire le fichier', 4000);
-  };
+  reader.onerror = function() { showToast('❌ Impossible de lire le fichier', 4000); };
   reader.readAsDataURL(file);
 }
 function resetPhotoForm() {
@@ -839,10 +810,12 @@ function resetPhotoForm() {
   const s = document.getElementById('photo-status');
   const i = document.getElementById('f-photo');
   const l = document.getElementById('photo-label');
+  const n = document.getElementById('photo-name');
   if (p) p.style.display = 'none';
   if (s) s.style.display = 'none';
   if (i) i.value = '';
   if (l) l.textContent = 'Choisir une image';
+  if (n) n.textContent = '';
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -868,7 +841,22 @@ function openSaisie(jour) {
   selectedDAMode = hasR ? 'retenue' : (hasC ? 'compteur' : null);
   document.querySelectorAll('.da-btn').forEach(b => b.classList.toggle('selected', b.dataset.mode === selectedDAMode));
   document.getElementById('f-remarque').value = cleanRemarque(raw);
+
+  // Reset photo + affichage de la photo existante si le jour en a une
   resetPhotoForm();
+  if (jour.photo && jour.photo.thumbUrl) {
+    const imgEl   = document.getElementById('photo-img');
+    const prevEl  = document.getElementById('photo-preview');
+    const labelEl = document.getElementById('photo-label');
+    const statEl  = document.getElementById('photo-status');
+    const nameEl  = document.getElementById('photo-name');
+    if (imgEl)   imgEl.src = jour.photo.thumbUrl;
+    if (prevEl)  prevEl.style.display = 'block';
+    if (labelEl) labelEl.textContent = '📷 Photo enregistrée (cliquer pour remplacer)';
+    if (statEl)  statEl.style.display = 'block';
+    if (nameEl)  nameEl.textContent = 'Photo du ' + jour.date;
+  }
+
   const isT = jour.type === 'Jour Travaillé' || jour.type === 'journee solidarité travaillé';
   document.getElementById('heures-form').style.display = isT ? 'block' : 'none';
   document.getElementById('da-form').style.display = isT ? 'block' : 'none';
@@ -899,7 +887,7 @@ function selectDAMode(mode, btn) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// SAUVEGARDE (sans envoi photo à Sheets)
+// SAUVEGARDE (sans envoi photo)
 // ═══════════════════════════════════════════════════════════════
 async function sauvegarder() {
   if (!currentSaisieRow || !selectedType) {
@@ -1023,12 +1011,11 @@ function renderMensuel(jours, sal, moisNom, semainesCompletes, recupGlobal, ijss
 
   let tTrav = 0, tEcart = 0, tM25 = 0, tAssim = 0, tM50 = 0, tBase = 0, dedDA = 0, detteRecupMin = 0;
   let nRtt = 0, nConge = 0, nMal = 0, nMalAvecSub = 0, nMalSansSub = 0, nAbs = 0, nAbsNR = 0, nCSS = 0, nFer = 0;
-  const congeDates = [];
   let rows = '';
 
   for (const k of Object.keys(semaines).map(Number).sort((a,b) => a-b)) {
     const js = semaines[k];
-    let wTrav = 0, wBase = 0, wAssim = 0, wBaseM = 0, wTravHS = 0, wFer = 0, wRtt = 0, wCong = 0, wMal = false, wEcart = 0;
+    let wTrav = 0, wBase = 0, wAssim = 0, wBaseM = 0, wTravHS = 0, wFer = 0, wRtt = 0, wCong = 0, wMal = false;
 
     for (const j of js) {
       const t = j.type || '';
@@ -1063,7 +1050,7 @@ function renderMensuel(jours, sal, moisNom, semainesCompletes, recupGlobal, ijss
         if (estMaladieAvecSubrogation(t)) nMalAvecSub++;
         if (estMaladieSansSubrogation(t)) nMalSansSub++;
         if (isR) nRtt++;
-        if (isC) { nConge++; congeDates.push(new Date(dL)); }
+        if (isC) nConge++;
         if (isF) nFer++;
       }
 
@@ -1083,7 +1070,6 @@ function renderMensuel(jours, sal, moisNom, semainesCompletes, recupGlobal, ijss
           wBase += bj;
           if (duMois) wBaseM += bj;
         }
-        if (isT && j.ecart) wEcart += parseDur(j.ecart);
       }
 
       const [dd, mm] = j.date.split('/');
@@ -1143,7 +1129,6 @@ function renderMensuel(jours, sal, moisNom, semainesCompletes, recupGlobal, ijss
   const cM = nConge * hJ;
   const nbLeg = nMal - nMalAvecSub - nMalSansSub;
   const dMal = (nbLeg + nMalSansSub) * hJ;
-  const annee = jours.length ? pd(jours[0].date).getFullYear() : new Date().getFullYear();
   let ij = { ijss: 0, maintien: 0 };
   if (ijssServeur && ijssServeur.ok) ij = { ijss: strToMin(ijssServeur.ijss), maintien: strToMin(ijssServeur.maintien) };
   const ijM = ij.ijss || 0, maM = ij.maintien || 0;
@@ -1170,13 +1155,6 @@ function renderMensuel(jours, sal, moisNom, semainesCompletes, recupGlobal, ijss
   if (cM > 0) html += '<div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:13px;color:var(--text2)">− Congés CIBTP</span><span style="font-size:18px;font-weight:700;color:var(--green)">' + minsToStr2(cM) + '</span></div>';
   if (dM > 0) html += '<div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:13px;color:var(--text2)">− Abs. non rém.</span><span style="font-size:18px;font-weight:700;color:var(--red)">' + minsToStr2(dM) + '</span></div>';
   if (dedDA > 0) html += '<div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:13px;color:var(--text2)">− Départs anticipés (retenue)</span><span style="font-size:18px;font-weight:700;color:var(--red)">' + minsToStr2(dedDA) + '</span></div>';
-  if (detteRecupMin > 0) html += '<div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:13px;color:var(--text2)">− Départs anticipés (dette récup.)</span><span style="font-size:18px;font-weight:700;color:var(--amber)">' + minsToStr2(detteRecupMin) + '</span></div>';
-  if (nMal > 0) {
-    html += '<div style="border-top:1px dashed #B0BEC5;margin:10px 0"></div><div style="font-size:11px;color:var(--text2);font-weight:600;margin-bottom:4px">🏥 Maladie (' + nMal + ' j.)</div>';
-    if (nMalAvecSub > 0) html += '<div style="display:flex;justify-content:space-between"><span style="font-size:13px;color:var(--text2)">Avec subrogation</span><span style="font-size:14px;font-weight:700;color:var(--green)">maintenu</span></div>';
-    if (nMalSansSub > 0) html += '<div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:13px;color:var(--text2)">− Sans subrogation</span><span style="font-size:14px;font-weight:700;color:var(--red)">' + minsToStr2(nMalSansSub*hJ) + '</span></div>';
-    if (nbLeg > 0) html += '<div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:13px;color:var(--text2)">− Déduction (type gén.)</span><span style="font-size:14px;font-weight:700;color:var(--red)">' + minsToStr2(nbLeg*hJ) + '</span></div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px"><span style="font-size:13px;color:var(--text2)">+ IJSS</span><input type="text" id="ijss-input" value="' + minsToStr2(ijM) + '" placeholder="0:00" onchange="updateIjssMaladie(\'' + sal + '\',' + annee + ',' + moisAff + ')" style="width:70px;text-align:right;font-size:14px;font-weight:700;color:var(--green);border:1px solid #B0BEC5;border-radius:6px;padding:3px 6px"></div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px"><span style="font-size:13px;color:var(--text2)">+ Maintien employeur</span><input type="text" id="maintien-input" value="' + minsToStr2(maM) + '" placeholder="0:00" onchange="updateIjssMaladie(\'' + sal + '\',' + annee + ',' + moisAff + ')" style="width:70px;text-align:right;font-size:14px;font-weight:700;color:var(--green);border:1px solid #B0BEC5;border-radius:6px;padding:3px 6px"></div>';
-  }
   html += '<div style="border-top:1px dashed #B0BEC5;margin:10px 0"></div>';
   if (!aT && !aJ) html += '<div style="margin:8px 0;padding:8px 10px;background:var(--red-l);border-left:3px solid var(--red);border-radius:4px;font-size:11px;color:var(--red);font-weight:600">⚠️ Aucun travail effectif — salaire employeur = 0:00</div>';
   html += '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--blue);border-radius:8px;padding:10px 12px"><span style="font-size:12px;color:rgba(255,255,255,.85);font-weight:600">Salaire employeur</span><span style="font-size:20px;font-weight:700;color:white">' + minsToStr2(totPaye) + '</span></div></div></div>';
@@ -1186,30 +1164,11 @@ function renderMensuel(jours, sal, moisNom, semainesCompletes, recupGlobal, ijss
       + '<div class="mens-total-card" style="background:#E8F5E9;border:1px solid var(--green)"><div class="val" style="color:var(--green)">' + minsToStr2(tM25+tM50) + '</div><div class="lbl" style="color:var(--green);font-weight:600">Crédit ce mois</div></div>'
       + '<div class="mens-total-card"><div class="val" style="color:var(--blue)">' + minsToStr2(tM25) + '</div><div class="lbl">HS 25%</div></div>'
       + '<div class="mens-total-card"><div class="val" style="color:var(--text2)">' + minsToStr2(tM50) + '</div><div class="lbl">HS 50%</div></div>'
-      + (detteRecupMin > 0 ? '<div class="mens-total-card" style="background:var(--amber-l);border:1px solid var(--amber)"><div class="val" style="color:var(--amber)">−' + minsToStr2(detteRecupMin) + '</div><div class="lbl" style="color:var(--amber);font-weight:600">Départ anticipé</div></div>' : '')
       + '</div>';
     html += renderSoldeCumul(recupGlobal, detteRecupMin);
     html += '</div>';
   }
   el.innerHTML = html;
-}
-
-async function updateIjssMaladie(sal, annee, mois) {
-  const elI = document.getElementById('ijss-input'), elM = document.getElementById('maintien-input');
-  if (!elI || !elM) return;
-  const key = 'deo_ijss_' + sal + '_' + annee + '_' + mois;
-  localStorage.setItem(key, JSON.stringify({ ijss: strToMin(elI.value), maintien: strToMin(elM.value) }));
-  let ij = null;
-  if (API_URL) {
-    const res = await apiGet({ action: 'saisir_ijss', salarie: sal, offset: currentMensMonthOffset, ijss: elI.value, maintien: elM.value });
-    if (res && res.ok) { ij = res; showToast('✅ IJSS enregistrés'); delete CACHE['mensuel_' + sal + '_' + currentMensMonthOffset]; }
-    else showToast('⚠️ Hors-ligne', 4000);
-  }
-  if (window.__lastMensuelArgs) {
-    const a = window.__lastMensuelArgs.slice();
-    if (ij) a[5] = ij;
-    renderMensuel(a[0], a[1], a[2], a[3], a[4], a[5]);
-  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1356,7 +1315,6 @@ function renderCalendrier(weeksData, month) {
   const hhm = s => { if (!s || s === '' || s === '0:00' || s === '0:00:00') return 0; const p = s.replace('-','').split(':'); return (parseInt(p[0])||0)*60 + (parseInt(p[1])||0); };
   const mh = m => Math.floor(m/60) + ':' + (m%60).toString().padStart(2,'0');
   for (const week of weeksData) {
-    let wMin = 0, baseA = (currentCalSalarie === 'ANTONIO' ? 39 : 35) * 60, aMal = false;
     let wMinM = 0, baseAM = 0, aMalM = false, aDM = false;
     const bjJ = idx => (currentCalSalarie === 'ANTONIO' && idx !== 4) ? 8*60 : 7*60;
     html += '<div style="display:flex;gap:6px;align-items:stretch;margin-bottom:4px"><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;flex:1">';
@@ -1369,14 +1327,12 @@ function renderCalendrier(weeksData, month) {
       const j = week.jours[i];
       if (j) {
         const isT = j.type === 'Jour Travaillé', isS = j.type === 'journee solidarité travaillé', isF = j.type === 'JOUR FERIE non travaillé';
-        const isA = ['CONGE','RTT','ABSENT','ARRET TRAVAIL MALADIE','ARRET MALADIE AVEC SUBROGATION','ARRET MALADIE SANS SUBROGATION','congé sans solde','absences non rémunérées avec retenue sur salaire'].includes(j.type);
-        if (estTypeMaladie(j.type)) { aMal = true; if (inM) aMalM = true; }
-        if (isT && j.travaille) { wMin += hhm(j.travaille); if (inM) wMinM += hhm(j.travaille); }
-        if (isS && j.travaille) { const d = hhm(j.travaille) - bj; if (d > 0) { wMin += d; if (inM) wMinM += d; } }
-        if (isF) { wMin += bj; if (inM) { wMinM += bj; baseAM += bj; } }
-        if (isA) baseA -= bj;
+        if (estTypeMaladie(j.type)) { if (inM) aMalM = true; }
+        if (isT && j.travaille) { if (inM) wMinM += hhm(j.travaille); }
+        if (isS && j.travaille) { const d = hhm(j.travaille) - bj; if (d > 0 && inM) wMinM += d; }
+        if (isF) { if (inM) { wMinM += bj; baseAM += bj; } }
         else if (inM && !isF) baseAM += bj;
-      } else baseA -= bj;
+      }
     }
     for (let i = 5; i < 7; i++) {
       const dt = new Date(week.monday); dt.setDate(dt.getDate() + i);
@@ -1446,9 +1402,6 @@ function openSaisieFromCalendrier(jour) {
   openSaisie(jour);
 }
 
-// ═══════════════════════════════════════════════════════════════
-// PDF CALENDRIER
-// ═══════════════════════════════════════════════════════════════
 async function telechargerPdfCalendrier() {
   const btn = document.querySelector('#page-calendrier .btn-save');
   if (!btn) return;
@@ -1479,7 +1432,6 @@ async function telechargerPdfCalendrier() {
     for (const j of jn) calH += '<td style="text-align:center;font-size:9px;font-weight:700;color:#607D8B;padding:2px 0">' + j + '</td>';
     calH += '<td style="text-align:center;font-size:9px;font-weight:700;color:#1565C0;padding:2px 0">Total</td></tr>';
     for (const mon of weeks) {
-      let wMin = 0, baseA = (currentCalSalarie === 'ANTONIO' ? 39 : 35) * 60, aMal = false;
       let wMinM = 0, baseAM = 0, aMalM = false, aDM = false;
       calH += '<tr style="height:55px">';
       for (let d = 0; d < 7; d++) {
@@ -1495,16 +1447,13 @@ async function telechargerPdfCalendrier() {
         let inner = '<b style="font-size:12px">' + dt.getDate() + '</b>';
         if (fW) inner += '<br><span style="color:#546E7A;font-size:9px">🎉 Férié</span>';
         const isT = j && j.type === 'Jour Travaillé', isS = j && j.type === 'journee solidarité travaillé', isF = j && j.type === 'JOUR FERIE non travaillé';
-        const isA = j && ['CONGE','RTT','ABSENT','ARRET TRAVAIL MALADIE','ARRET MALADIE AVEC SUBROGATION','ARRET MALADIE SANS SUBROGATION','congé sans solde','absences non rémunérées avec retenue sur salaire'].includes(j.type);
-        if (j && estTypeMaladie(j.type)) { aMal = true; if (inM) aMalM = true; }
+        if (j && estTypeMaladie(j.type)) { if (inM) aMalM = true; }
         if ((isT || isS) && j.travaille && j.travaille !== '0:00' && j.travaille !== '0:00:00') {
           inner += '<br><span style="color:#1565C0;font-size:10px">' + j.travaille.replace(':00','') + '</span>';
-          if (isT) { wMin += hhm(j.travaille); if (inM) wMinM += hhm(j.travaille); }
-          if (isS) { const d = hhm(j.travaille) - bj; if (d > 0) { wMin += d; if (inM) wMinM += d; } }
+          if (isT) { if (inM) wMinM += hhm(j.travaille); }
+          if (isS) { const d = hhm(j.travaille) - bj; if (d > 0 && inM) wMinM += d; }
         } else if (j) { const l = lT(j.type); if (l) inner += '<br><span style="color:#546E7A;font-size:9px">' + l + '</span>'; }
-        if (isF) { wMin += bj; if (inM) { wMinM += bj; baseAM += bj; } }
-        if (isA) baseA -= bj;
-        else if (!j) baseA -= bj;
+        if (isF) { if (inM) { wMinM += bj; baseAM += bj; } }
         else if (inM && !isF && d < 5) baseAM += bj;
         calH += '<td style="' + cS + 'background:' + bg + ';opacity:' + op + '">' + inner + '</td>';
       }
@@ -1746,7 +1695,7 @@ function refreshAll() {
   showToast('🔄 Actualisation...');
 }
 
-window.addEventListener('load', async () => {
+window.addEventListener('load', async function() {
   setStatus('Connexion...');
   await loadSolde();
 });
