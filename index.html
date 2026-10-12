@@ -287,17 +287,17 @@ window.addEventListener('DOMContentLoaded',()=>{if(sessionStorage.getItem('deo_a
         <textarea id="f-remarque" rows="3" placeholder="Saisir une remarque..." style="width:100%;padding:12px;border:2px solid #E0E0E0;border-radius:10px;font-size:14px;resize:vertical;font-family:inherit;outline:none;box-sizing:border-box"></textarea>
       </div>
       <div id="photo-form" style="margin-top:12px">
-        <label class="form-label">📷 Image (aperçu local — non envoyée à Sheets)</label>
+        <label class="form-label">📷 Image (aperçu local uniquement)</label>
         <div id="photo-preview" style="display:none;margin-bottom:10px;text-align:center">
           <img id="photo-img" style="max-width:100%;border-radius:10px;max-height:180px;object-fit:cover">
           <div style="font-size:11px;color:var(--text2);margin-top:4px" id="photo-name"></div>
         </div>
         <label class="photo-zone">
           <span style="font-size:24px">📷</span>
-          <span id="photo-label">Choisir une image (aperçu seulement)</span>
-          <input type="file" id="f-photo" accept="image/*" onchange="previewPhoto(this)" style="display:none">
+          <span id="photo-label">Choisir une image</span>
+          <input type="file" id="f-photo" accept="image/*" onchange="previewPhoto(this)" onclick="this.value=null" style="display:none">
         </label>
-        <div class="photo-status" id="photo-status">✓ Aperçu chargé (non envoyé)</div>
+        <div class="photo-status" id="photo-status">✓ Aperçu chargé</div>
       </div>
       <button class="btn-save" id="btn-save" onclick="sauvegarder()" disabled>Enregistrer dans Sheets</button>
     </div>
@@ -796,18 +796,40 @@ function afficherRemarque(date, texte) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// PHOTO (aperçu local seulement)
+// PHOTO (aperçu local uniquement)
 // ═══════════════════════════════════════════════════════════════
 function previewPhoto(input) {
-  if (!input.files || !input.files[0]) return;
+  console.log('[previewPhoto] déclenchée');
+  if (!input.files || input.files.length === 0) {
+    console.log('[previewPhoto] aucun fichier');
+    return;
+  }
   const file = input.files[0];
+  console.log('[previewPhoto] fichier:', file.name, file.type, file.size);
+
+  if (!file.type || file.type.indexOf('image/') !== 0) {
+    showToast('❌ Sélectionnez une image (JPG, PNG...)', 4000);
+    return;
+  }
+
   const reader = new FileReader();
   reader.onload = function(e) {
-    document.getElementById('photo-img').src = e.target.result;
-    document.getElementById('photo-preview').style.display = 'block';
-    document.getElementById('photo-label').textContent = 'Changer l\'image';
-    document.getElementById('photo-status').style.display = 'block';
-    document.getElementById('photo-name').textContent = file.name;
+    console.log('[previewPhoto] lecture OK, taille =', e.target.result.length);
+    const img     = document.getElementById('photo-img');
+    const preview = document.getElementById('photo-preview');
+    const label   = document.getElementById('photo-label');
+    const status  = document.getElementById('photo-status');
+    const name    = document.getElementById('photo-name');
+    if (img)     img.src = e.target.result;
+    if (preview) preview.style.display = 'block';
+    if (label)   label.textContent = 'Changer l\'image';
+    if (status)  status.style.display = 'block';
+    if (name)    name.textContent = file.name + ' (' + Math.round(file.size / 1024) + ' Ko)';
+    showToast('✅ Aperçu chargé', 1500);
+  };
+  reader.onerror = function(e) {
+    console.error('[previewPhoto] ERREUR lecture:', e);
+    showToast('❌ Impossible de lire le fichier', 4000);
   };
   reader.readAsDataURL(file);
 }
@@ -820,7 +842,7 @@ function resetPhotoForm() {
   if (p) p.style.display = 'none';
   if (s) s.style.display = 'none';
   if (i) i.value = '';
-  if (l) l.textContent = 'Choisir une image (aperçu seulement)';
+  if (l) l.textContent = 'Choisir une image';
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -877,7 +899,7 @@ function selectDAMode(mode, btn) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// SAUVEGARDE (sans photo — envoi uniquement type/heures/remarque)
+// SAUVEGARDE (sans envoi photo à Sheets)
 // ═══════════════════════════════════════════════════════════════
 async function sauvegarder() {
   if (!currentSaisieRow || !selectedType) {
@@ -1324,7 +1346,8 @@ async function loadCalendrier() {
 
 function renderCalendrier(weeksData, month) {
   const jn = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
-  const ml = document.getElementById('cal-month-label') ? document.getElementById('cal-month-label').textContent : '';
+  const mlEl = document.getElementById('cal-month-label');
+  const ml = mlEl ? mlEl.textContent : '';
   let html = '<div class="card"><div style="text-align:center;margin-bottom:10px"><div style="font-size:16px;font-weight:700;color:var(--blue)">' + currentCalSalarie + '</div><div style="font-size:12px;color:var(--text2)">' + ml + '</div></div>';
   html += '<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px"><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;flex:1">';
   for (const j of jn) html += '<div class="cal-head">' + j + '</div>';
@@ -1660,12 +1683,12 @@ async function captureSolde() {
 }
 async function captureSemaine() {
   const b = document.getElementById('btn-capture-semaine'); b.disabled = true; b.textContent = '⏳...';
-  try { const l = document.getElementById('week-label-main') ? document.getElementById('week-label-main').textContent : 'Semaine'; const c = await captureElementComplet(document.getElementById('semaine-content')); const a = fitToA4(c); downloadImage(a.toDataURL('image/jpeg', 0.92), 'Semaine_' + currentSalarie + '_' + l.replace(/\s/g,'_') + '.jpg'); showToast('✅ Image téléchargée !', 2000); } catch(e) { showToast('❌ ' + e.message, 4000); } finally { b.disabled = false; b.textContent = '📸 Capturer la semaine en image'; }
+  try { const lEl = document.getElementById('week-label-main'); const l = lEl ? lEl.textContent : 'Semaine'; const c = await captureElementComplet(document.getElementById('semaine-content')); const a = fitToA4(c); downloadImage(a.toDataURL('image/jpeg', 0.92), 'Semaine_' + currentSalarie + '_' + l.replace(/\s/g,'_') + '.jpg'); showToast('✅ Image téléchargée !', 2000); } catch(e) { showToast('❌ ' + e.message, 4000); } finally { b.disabled = false; b.textContent = '📸 Capturer la semaine en image'; }
 }
 async function captureMensuel() {
   const b = document.getElementById('btn-capture-mensuel'); b.disabled = true; b.textContent = '⏳...';
   const el = document.getElementById('mensuel-content');
-  try { const m = document.getElementById('mens-month-label') ? document.getElementById('mens-month-label').textContent : 'Mois'; el.classList.add('capture-hide-daily'); const c = await captureElementComplet(el, null, 900); downloadImage(c.toDataURL('image/jpeg', 0.95), 'Mensuel_' + currentMensSalarie + '_' + m.replace(/\s/g,'_') + '.jpg'); showToast('✅ Image téléchargée !', 2000); } catch(e) { showToast('❌ ' + e.message, 4000); } finally { el.classList.remove('capture-hide-daily'); b.disabled = false; b.textContent = '📸 Capturer le mois en image'; }
+  try { const mEl = document.getElementById('mens-month-label'); const m = mEl ? mEl.textContent : 'Mois'; el.classList.add('capture-hide-daily'); const c = await captureElementComplet(el, null, 900); downloadImage(c.toDataURL('image/jpeg', 0.95), 'Mensuel_' + currentMensSalarie + '_' + m.replace(/\s/g,'_') + '.jpg'); showToast('✅ Image téléchargée !', 2000); } catch(e) { showToast('❌ ' + e.message, 4000); } finally { el.classList.remove('capture-hide-daily'); b.disabled = false; b.textContent = '📸 Capturer le mois en image'; }
 }
 async function captureRecap() {
   const b = document.getElementById('btn-capture-recap'); b.disabled = true; b.textContent = '⏳...';
@@ -1673,7 +1696,7 @@ async function captureRecap() {
 }
 async function captureCalendrier() {
   const b = document.getElementById('btn-capture-calendrier'); b.disabled = true; b.textContent = '⏳...';
-  try { const m = document.getElementById('cal-month-label') ? document.getElementById('cal-month-label').textContent : 'Mois'; const c = await captureElementComplet(document.getElementById('calendrier-content')); const a = fitToA4(c, 50, 'landscape'); downloadImage(a.toDataURL('image/jpeg', 0.92), 'Calendrier_' + currentCalSalarie + '_' + m.replace(/\s/g,'_') + '.jpg'); showToast('✅ Image téléchargée !', 2000); } catch(e) { showToast('❌ ' + e.message, 4000); } finally { b.disabled = false; b.textContent = '📸 Capturer le calendrier en image'; }
+  try { const mEl = document.getElementById('cal-month-label'); const m = mEl ? mEl.textContent : 'Mois'; const c = await captureElementComplet(document.getElementById('calendrier-content')); const a = fitToA4(c, 50, 'landscape'); downloadImage(a.toDataURL('image/jpeg', 0.92), 'Calendrier_' + currentCalSalarie + '_' + m.replace(/\s/g,'_') + '.jpg'); showToast('✅ Image téléchargée !', 2000); } catch(e) { showToast('❌ ' + e.message, 4000); } finally { b.disabled = false; b.textContent = '📸 Capturer le calendrier en image'; }
 }
 
 function calculerConges() {
