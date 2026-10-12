@@ -915,7 +915,7 @@ async function sauvegarder() {
     const fin = isT ? document.getElementById('f-fin').value : '';
     const arr = isT ? document.getElementById('f-arrivee').value : '';
 
-    // ⭐ 1 seul appel GET pour type + fin + remarque
+    // 1 seul appel — type + fin + remarque
     const rJournee = await apiGet({
       action: 'saisir_journee',
       salarie: currentSalarie,
@@ -927,9 +927,32 @@ async function sauvegarder() {
     });
 
     if (!rJournee || !rJournee.ok) {
-      showToast('❌ Erreur saisie : ' + (rJournee?.error || 'inconnue'), 6000);
+      showToast('❌ Erreur : ' + (rJournee?.error || 'inconnue'), 6000);
       btn.disabled = false;
       btn.textContent = 'Enregistrer dans Sheets';
+      return;
+    }
+
+    // ⚠️ PHOTO NON ENVOYÉE À SHEETS — à ajouter manuellement
+    // (l'aperçu reste visible seulement pendant la saisie)
+
+    delete CACHE.solde;
+    delete CACHE.dettesDA;
+    Object.keys(CACHE).forEach(k => {
+      if (k.startsWith('semaine_' + currentSalarie) ||
+          k.startsWith('mensuel_' + currentSalarie) ||
+          k === 'recap_' + currentSalarie) delete CACHE[k];
+    });
+
+    const dt = ((Date.now() - t0) / 1000).toFixed(1);
+    showToast('✅ Enregistré (' + dt + 's)', 2500);
+    hideSaisie();
+    loadSemaine(currentSalarie);
+
+  } catch(e) {
+    showToast('❌ ' + e.message, 6000);
+    btn.disabled = false;
+    btn.textContent = 'Enregistrer dans Sheets';
       return;
     }
 
