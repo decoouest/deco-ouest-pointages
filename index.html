@@ -164,6 +164,8 @@ main{padding:16px;max-width:600px;margin:0 auto}
 .img-hint .img-pop img{width:100%;border-radius:6px;display:block;max-height:200px;object-fit:cover}
 .img-hint .img-pop .legende{font-size:10px;color:var(--text2);margin-top:4px}
 .img-hint:hover .img-pop{display:block}
+.photo-zone{display:flex;align-items:center;justify-content:center;gap:10px;background:var(--gray-l);border:2px dashed #B0BEC5;border-radius:10px;padding:16px;cursor:pointer;font-size:14px;color:var(--text2)}
+.photo-status{display:none;margin-top:8px;padding:8px 10px;background:var(--green-l);border-radius:8px;font-size:12px;color:var(--green);font-weight:600}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
 </head>
@@ -213,10 +215,6 @@ window.addEventListener('DOMContentLoaded',()=>{if(sessionStorage.getItem('deo_a
 
 <main>
 <div id="page-solde" class="page active">
-  <div style="margin-bottom:10px">
-    <button class="btn-save" onclick="telechargerPdfSolde()" id="btn-pdf-solde">📄 Télécharger le rapport Solde en PDF</button>
-    <button class="btn-save" onclick="captureSolde()" id="btn-capture-solde" style="margin-top:8px;background:#2E7D32">📸 Capturer Solde en image</button>
-  </div>
   <div id="solde-content"><div class="loader"><div class="spinner"></div><div class="loader-text">Chargement...</div></div></div>
 </div>
 
@@ -235,7 +233,6 @@ window.addEventListener('DOMContentLoaded',()=>{if(sessionStorage.getItem('deo_a
     <input type="date" class="date-picker-input" id="week-date-picker" onchange="goToDate(this.value)">
     <button class="week-nav-btn today-btn" onclick="goToToday()">Auj.</button>
   </div>
-  <div style="margin-bottom:8px"><button class="btn-save" onclick="captureSemaine()" id="btn-capture-semaine" style="background:#2E7D32">📸 Capturer la semaine en image</button></div>
   <div id="semaine-content"><div class="loader"><div class="spinner"></div><div class="loader-text">Chargement...</div></div></div>
   <div id="saisie-page" style="display:none">
     <div class="card">
@@ -285,12 +282,17 @@ window.addEventListener('DOMContentLoaded',()=>{if(sessionStorage.getItem('deo_a
         <textarea id="f-remarque" rows="3" placeholder="Saisir une remarque..." style="width:100%;padding:12px;border:2px solid #E0E0E0;border-radius:10px;font-size:14px;resize:vertical;font-family:inherit;outline:none;box-sizing:border-box"></textarea>
       </div>
       <div id="photo-form" style="margin-top:12px">
-        <label class="form-label">📷 Image</label>
+        <label class="form-label">📷 Image (colonne K)</label>
         <div id="photo-preview" style="display:none;margin-bottom:10px;text-align:center">
           <img id="photo-img" style="max-width:100%;border-radius:10px;max-height:180px;object-fit:cover">
           <div style="font-size:11px;color:var(--text2);margin-top:4px" id="photo-name"></div>
         </div>
-        <input type="file" id="f-photo" accept="image/*" style="padding:10px;border:2px dashed #B0BEC5;border-radius:10px;width:100%;background:var(--gray-l);font-size:13px">
+        <label class="photo-zone">
+          <span style="font-size:24px">📷</span>
+          <span id="photo-label">Choisir une image</span>
+          <input type="file" id="f-photo" accept="image/*" onchange="previewPhoto(this)" style="display:none">
+        </label>
+        <div class="photo-status" id="photo-status">✓ Image prête à envoyer</div>
       </div>
       <button class="btn-save" id="btn-save" onclick="sauvegarder()" disabled>Enregistrer dans Sheets</button>
     </div>
@@ -310,10 +312,6 @@ window.addEventListener('DOMContentLoaded',()=>{if(sessionStorage.getItem('deo_a
     <button class="week-nav-btn" onclick="changeMensMonth(1)">›</button>
   </div>
   <div id="mensuel-content"><div class="loader"><div class="spinner"></div><div class="loader-text">Chargement...</div></div></div>
-  <div style="margin-top:10px">
-    <button class="btn-save" id="btn-pdf-mensuel" onclick="telechargerPdfMensuel()">📄 Télécharger le mois en PDF</button>
-    <button class="btn-save" id="btn-capture-mensuel" onclick="captureMensuel()" style="margin-top:8px;background:#2E7D32">📸 Capturer le mois en image</button>
-  </div>
 </div>
 
 <div id="page-recap" class="page">
@@ -322,7 +320,6 @@ window.addEventListener('DOMContentLoaded',()=>{if(sessionStorage.getItem('deo_a
     <button class="sal-btn artiom" onclick="setRecapSal('ARTIOM',this)">Artiom</button>
     <button class="sal-btn antonio" onclick="setRecapSal('ANTONIO',this)">Antonio</button>
   </div>
-  <div style="margin-bottom:10px"><button class="btn-save" onclick="captureRecap()" id="btn-capture-recap" style="background:#2E7D32">📸 Capturer le récap en image</button></div>
   <div id="recap-content"><div class="loader"><div class="spinner"></div><div class="loader-text">Chargement...</div></div></div>
 </div>
 
@@ -339,7 +336,6 @@ window.addEventListener('DOMContentLoaded',()=>{if(sessionStorage.getItem('deo_a
     <button class="week-nav-btn" onclick="changeCalMonth(1)">›</button>
   </div>
   <div id="calendrier-content"><div class="loader"><div class="spinner"></div><div class="loader-text">Chargement...</div></div></div>
-  <div style="margin-top:8px"><button class="btn-save" onclick="captureCalendrier()" id="btn-capture-calendrier" style="background:#2E7D32">📸 Capturer le calendrier en image</button></div>
 </div>
 
 <div id="page-config" class="page">
@@ -347,23 +343,10 @@ window.addEventListener('DOMContentLoaded',()=>{if(sessionStorage.getItem('deo_a
     <div class="card-title">🔗 Connexion Google Sheets</div>
     <div class="form-group">
       <label class="form-label">URL du déploiement Apps Script</label>
-      <textarea class="config-input" id="api-url" rows="3" placeholder="https://script.google.com/macros/s/AKfy.../exec"></textarea>
-      <div class="config-hint">1. Google Sheets → Extensions → Apps Script<br>2. Déployer → Application Web<br>3. Accès : <strong>Toute personne</strong><br>4. Coller l'URL ici</div>
+      <textarea class="config-input" id="api-url" rows="3"></textarea>
     </div>
     <button class="btn-config" onclick="saveConfig()">✅ Sauvegarder & Tester</button>
     <button class="btn-config" style="background:var(--gray-l);color:var(--text2)" onclick="reinitialiserConfig()">↺ Réinitialiser</button>
-  </div>
-  <div class="card" style="margin-top:12px;border-left:4px solid var(--green)">
-    <div class="card-title" style="color:var(--green)">🧮 Calculateur congés CIBTP</div>
-    <div class="form-group"><label class="form-label">Salarié</label>
-      <select class="config-input" id="cc-salarie"><option value="ANATOLE">Anatole (35h)</option><option value="ARTIOM">Artiom (35h)</option><option value="ANTONIO">Antonio (39h)</option></select>
-    </div>
-    <div style="display:flex;gap:8px">
-      <div class="form-group" style="flex:1"><label class="form-label">Début</label><input class="config-input" type="date" id="cc-debut"></div>
-      <div class="form-group" style="flex:1"><label class="form-label">Fin</label><input class="config-input" type="date" id="cc-fin"></div>
-    </div>
-    <button class="btn-config" onclick="calculerConges()">🧮 Calculer</button>
-    <div id="cc-resultat" style="margin-top:12px"></div>
   </div>
 </div>
 </main>
@@ -386,7 +369,6 @@ let semaineLoadToken = 0, mensuelLoadToken = 0, recapLoadToken = 0;
 
 document.getElementById('api-url').value = API_URL;
 
-// ═══ NAVIGATION ═══
 function goTab(name, btn) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -420,7 +402,6 @@ function setCalSal(n, b) { currentCalSalarie = n; document.querySelectorAll('#pa
 function changeCalMonth(d) { currentCalMonthOffset += d; loadCalendrier(); }
 function goToCalToday() { currentCalMonthOffset = 0; loadCalendrier(); }
 
-// ═══ API ═══
 async function apiGet(p) {
   if (!API_URL) return null;
   const c = new AbortController();
@@ -454,7 +435,7 @@ async function apiPost(body, timeoutMs) {
 }
 
 function setStatus(m) { const e = document.getElementById('nav-status'); if (e) e.textContent = m; }
-function showToast(m, d = 3000) { const t = document.getElementById('toast'); if (!t) { console.log('[toast]', m); return; } t.textContent = m; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), d); }
+function showToast(m, d = 3000) { const t = document.getElementById('toast'); if (!t) return; t.textContent = m; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), d); }
 function minsToStr2(m) { const n = m<0, a = Math.abs(m); return (n?'-':'') + Math.floor(a/60) + ':' + String(a%60).padStart(2,'0'); }
 function strToMin(s) { if (!s) return 0; s = String(s).trim(); const n = s.startsWith('-'); const c = s.replace('-',''); const p = c.split(':'); const t = (parseInt(p[0])||0)*60 + (parseInt(p[1])||0); return n ? -t : t; }
 function cleanTime(s) { if (!s) return s; const p = s.split(':'); return p.length===3 ? p[0]+':'+p[1] : s; }
@@ -476,7 +457,6 @@ function buildImageBadge(photo, date, style) {
   return '<span class="img-hint" style="display:inline-block;vertical-align:middle' + extraStyle + '"><span title="Cliquer pour voir la photo HD" onclick="event.stopPropagation(); window.open(\'' + viewUrl + '\',\'_blank\')">📷</span><span class="img-pop"><img src="' + url + '" alt="Photo ' + date + '" loading="lazy"><div class="legende">' + date + ' — cliquer pour la HD</div></span></span>';
 }
 
-// ═══ NATURE ═══
 const NATURE = {
   'Jour Travaillé': { label:'Travaillé', trav:true, assim:true, paye:true, icone:'✅', couleur:'#E3F2FD' },
   'journee solidarité travaillé': { label:'Solidarité', trav:true, assim:true, paye:true, icone:'🤝', couleur:'#E3F2FD' },
@@ -525,141 +505,32 @@ function buildTooltip(t) {
   const n = natureOf(t);
   if (!n || t === 'week end') return '';
   const r = (l, v) => '<tr><td>' + l + '</td><td>' + (v ? '✅' : '❌') + '</td></tr>';
-  return '<span class="tooltip-nature">' + n.icone + ' ' + n.label + '<div class="tooltip-box"><strong style="font-size:11px">' + n.label + '</strong><table style="margin-top:6px">' + r('Travail effectif', n.trav) + r('Heures assimilées', n.assim) + r('Payé employeur', n.paye) + r('Génère des HS', n.trav) + r('Déduit du salaire', !n.paye && !n.trav) + '</table></div></span>';
-}
-function buildAuditPanel(id, d) {
-  const f = m => { const n = m<0, a = Math.abs(m); return (n?'-':'') + Math.floor(a/60) + ':' + String(a%60).padStart(2,'0'); };
-  const conf = d.ecart >= -60;
-  let r = '<tr><td>Travail effectif</td><td>' + f(d.trav) + '</td></tr><tr><td>Base hebdo</td><td>' + f(d.base) + '</td></tr><tr><td>Écart</td><td style="color:' + (d.ecart>=0?'var(--green)':'var(--red)') + '">' + f(d.ecart) + '</td></tr>';
-  if (d.ferie) r += '<tr><td>Férié assimilé</td><td>' + f(d.ferie) + '</td></tr>';
-  if (d.rtt) r += '<tr><td>RTT assimilé</td><td>' + f(d.rtt) + '</td></tr>';
-  if (d.conge) r += '<tr><td>Congés assimilés</td><td>' + f(d.conge) + '</td></tr>';
-  r += '<tr><td>HS 25%</td><td style="color:var(--blue)">' + f(d.maj25) + '</td></tr><tr><td>HS 50%</td><td style="color:var(--red)">' + f(d.maj50) + '</td></tr><tr><td>Crédit récup.</td><td style="color:var(--green)">' + f(d.maj25+d.maj50) + '</td></tr><tr><td>Total payé</td><td style="font-weight:700">' + f(d.total) + '</td></tr><tr><td>Contrôle</td><td class="audit-ok">' + (conf ? '✅ Conforme' : '⚠️ Vérifier') + '</td></tr>';
-  return '<div id="audit-' + id + '" class="audit-panel"><strong style="color:var(--green);font-size:12px">🔎 Audit — Semaine</strong><table style="margin-top:8px">' + r + '</table></div>';
-}
-function toggleAudit(id) { const el = document.getElementById('audit-' + id); if (el) el.classList.toggle('open'); }
-function detailSemaine(d) {
-  if (!d.total && !d.trav && !d.assim) return '';
-  const t = [];
-  if (d.trav > 0) t.push({ s: '', x: minsToStr2(d.trav) + ' travail effectif' });
-  if (d.ferie > 0) t.push({ s: '+', x: '<span style="color:#F9A825">' + minsToStr2(d.ferie) + ' férié assimilé</span>' });
-  if (d.rtt > 0) t.push({ s: '+', x: '<span style="color:#9C27B0">' + minsToStr2(d.rtt) + ' RTT assimilé</span>' });
-  if (d.conge > 0) t.push({ s: '+', x: '<span style="color:var(--green)">' + minsToStr2(d.conge) + ' congés payés</span>' });
-  if (!d.antonio) {
-    if (!d.arretMaladie && d.ecart !== 0) { const m = d.ecart < 0; t.push({ s: m ? '+' : '−', x: '<span style="color:' + (m?'#1B5E20':'#B71C1C') + '">' + minsToStr2(Math.abs(d.ecart)) + ' ajustement base (écart ' + minsToStr2(d.ecart) + ')</span>' }); }
-    if (d.maj25 > 0) t.push({ s: '+', x: '<span style="color:var(--blue)">' + minsToStr2(d.maj25) + ' maj. 25%</span>' });
-    if (d.maj50 > 0) t.push({ s: '+', x: '<span style="color:#C62828">' + minsToStr2(d.maj50) + ' maj. 50%</span>' });
-  }
-  if (!t.length) return '';
-  return '<strong>' + minsToStr2(d.total) + '</strong> = ' + t.map((v, i) => (i === 0 ? v.x : v.s + ' ' + v.x)).join(' ');
-}
-function renderSoldeCumul(r, ajustementMin) {
-  if (!r) return '';
-  ajustementMin = ajustementMin || 0;
-  const soldeAjusteMin = r.soldeMin - ajustementMin;
-  const soldeAjusteStr = minsToStr2(soldeAjusteMin);
-  const soldeAjusteEnJours = (soldeAjusteMin / 60 / 7).toFixed(1);
-  const pos = soldeAjusteMin >= 0;
-  const c = pos ? 'var(--green)' : 'var(--red)';
-  const bg = pos ? '#E8F5E9' : 'var(--red-l)';
-  const cell = (b, v, l) => '<div style="text-align:center;background:' + b + ';border-radius:8px;padding:6px 10px"><div style="font-size:12px;font-weight:700">' + v + '</div><div style="font-size:9px;color:var(--text2)">' + l + '</div></div>';
-  let h = '<div style="margin-top:10px;padding-top:10px;border-top:1px dashed #A5D6A7"><div style="font-size:11px;color:var(--text2);margin-bottom:6px">📊 Solde depuis le 01/01 (report 2025 inclus)</div><div style="display:flex;gap:8px;flex-wrap:wrap">';
-  h += cell('var(--gray-l)', r.report, 'Report 2025');
-  h += cell('var(--blue-l)', '+' + r.acquis, 'Acquis 2026');
-  h += cell('#FFF8E1', '-' + r.pris, 'RTT pris (' + r.rttPris + 'j)');
-  if (ajustementMin > 0) h += cell('var(--amber-l)', '-' + minsToStr2(ajustementMin), 'Départ anticipé');
-  h += '<div style="flex:1;text-align:center;border-radius:8px;padding:6px 12px;background:' + bg + ';border:2px solid ' + c + '"><div style="font-size:18px;font-weight:700;color:' + c + '">' + soldeAjusteStr + '</div><div style="font-size:9px;font-weight:600;color:' + c + '">SOLDE FINAL (' + soldeAjusteEnJours + 'j)</div></div></div></div>';
-  return h;
+  return '<span class="tooltip-nature">' + n.icone + ' ' + n.label + '<div class="tooltip-box"><strong style="font-size:11px">' + n.label + '</strong><table style="margin-top:6px">' + r('Travail effectif', n.trav) + r('Heures assimilées', n.assim) + r('Payé employeur', n.paye) + '</table></div></span>';
 }
 
 // ═══ SOLDE ═══
-async function calculerDetteDepartAnticipe(salarie, offset) {
-  try {
-    const ck = 'mensuel_' + salarie + '_' + (offset || 0);
-    let data = CACHE[ck];
-    if (!data || !data.mois) { data = await apiGet({ action: 'mois', salarie: salarie, offset: offset || 0 }); if (data && data.ok) CACHE[ck] = data; }
-    if (!data || !data.mois) return 0;
-    let dette = 0;
-    for (const j of data.mois) {
-      if (j.ecart && typeof j.ecart === 'string' && j.ecart.startsWith('-') && j.remarque && j.remarque.startsWith(COMPTEUR_MARKER)) {
-        const c = j.ecart.replace('-', '');
-        const p = c.split(':');
-        dette += (parseInt(p[0]) || 0) * 60 + (parseInt(p[1]) || 0);
-      }
-    }
-    return dette;
-  } catch(e) { console.error('Erreur dette DA:', e); return 0; }
-}
 async function loadSolde() {
   const el = document.getElementById('solde-content');
-  if (!API_URL) { el.innerHTML = '<div class="card"><div class="empty">⚙️ Configurez l\'URL Apps Script</div></div>'; return; }
-  const hasCache = !!CACHE.solde;
-  if (hasCache) renderSoldeData(CACHE.solde, CACHE.dettesDA || {});
-  else el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Lecture du Sheets...</div></div>';
+  if (!API_URL) { el.innerHTML = '<div class="card"><div class="empty">⚙️ Configurez l\'URL</div></div>'; return; }
   const data = await apiGet({ action: 'solde' });
-  if (!data || data.error) {
-    if (!hasCache) { setStatus(data ? 'Erreur script' : 'Non connecté'); el.innerHTML = '<div class="alerte danger">❌ ' + (data?.error || 'Erreur de connexion') + '</div>'; }
-    return;
-  }
+  if (!data || data.error) { setStatus('Non connecté'); el.innerHTML = '<div class="alerte danger">❌ ' + (data?.error || 'Erreur') + '</div>'; return; }
   CACHE.solde = data;
-  const dettes = {};
+  let html = '';
   for (const s of data.salaries) {
-    const nomKey = s.nom.trim().toUpperCase();
-    dettes[nomKey] = await calculerDetteDepartAnticipe(nomKey, 0);
-  }
-  CACHE.dettesDA = dettes;
-  renderSoldeData(data, dettes);
-}
-function renderSoldeData(data, dettes) {
-  dettes = dettes || {};
-  const el = document.getElementById('solde-content');
-  const alertes = buildAlertes(data.salaries);
-  let html = alertes.map(a => '<div class="alerte ' + a.type + '">⚠️ ' + a.msg + '</div>').join('');
-  for (const s of data.salaries) {
-    const nomKey = s.nom.trim().toUpperCase();
-    const detteDA = dettes[nomKey] || 0;
-    const soldeAdjMin = strToMin(s.solde) - detteDA;
-    const soldeAdjStr = detteDA > 0 ? minsToStr2(soldeAdjMin) : s.solde;
     let solHtml = s.solidarite && s.solidarite.found
-      ? '<div style="margin-top:8px;background:rgba(21,101,192,.08);border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:8px"><span style="font-size:15px">🤝</span><div style="font-size:12px;color:var(--text)">Journée de solidarité : <strong style="color:var(--blue)">' + s.solidarite.date + '</strong></div></div>'
-      : '<div style="margin-top:8px;background:var(--amber-l);border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:8px"><span style="font-size:15px">⚠️</span><div style="font-size:12px;color:var(--amber);font-weight:600">Journée de solidarité non effectuée</div></div>';
-    let recupHtml = '';
-    if (s.recup && s.recup.ok) {
-      const r = s.recup;
-      const soldeAjusteMin = r.soldeMin - detteDA;
-      const soldeAjusteStr = minsToStr2(soldeAjusteMin);
-      const soldeAjusteEnJours = (soldeAjusteMin / 60 / 7).toFixed(1);
-      const sc = soldeAjusteMin < 0 ? 'var(--red)' : 'var(--green)';
-      recupHtml = '<div style="margin-top:8px;background:white;border-radius:8px;padding:8px 10px;border-left:3px solid var(--green)"><div style="font-size:11px;color:var(--text2);margin-bottom:4px">🔄 Compteur récupération — cumul ' + new Date().getFullYear() + '</div><div style="display:flex;gap:12px;font-size:12px;flex-wrap:wrap"><div>Report : <strong>' + r.report + '</strong></div><div>Acquis : <strong style="color:var(--blue)">+' + r.acquis + '</strong></div><div>RTT pris : <strong style="color:var(--amber)">' + r.rttPris + ' j</strong></div>' + (detteDA > 0 ? '<div>Départ anticipé : <strong style="color:var(--amber)">−' + minsToStr2(detteDA) + '</strong></div>' : '') + '<div>Solde : <strong style="color:' + sc + '">' + soldeAjusteStr + ' <span style="opacity:.7">(' + soldeAjusteEnJours + 'j)</span></strong></div></div></div>';
-    }
-    let congesHtml = '';
-    if (s.conges && s.conges.ok) {
-      const c = s.conges;
-      const rc = c.restant < 0 ? 'var(--red)' : 'var(--green)';
-      congesHtml = '<div style="margin-top:8px;background:white;border-radius:8px;padding:8px 10px"><div style="font-size:11px;color:var(--text2);margin-bottom:4px">🏖 Congés payés — ' + c.periodeDebut + ' → ' + c.periodeFin + '</div><div style="display:flex;gap:10px;font-size:12px"><div>Acquis : <strong>' + c.acquis + 'j</strong></div><div>Pris : <strong>' + c.pris + 'j</strong></div><div>Restant : <strong style="color:' + rc + '">' + c.restant + 'j</strong></div></div></div>';
-    }
-    html += '<div class="solde-card ' + (s.positif ? 'positif' : 'negatif') + '"><div style="display:flex;align-items:center;justify-content:space-between"><span class="solde-nom">' + s.nom + '</span><span class="solde-badge ' + (s.positif ? 'positif' : 'negatif') + '">' + s.statut + '</span></div>'
+      ? '<div style="margin-top:8px;background:rgba(21,101,192,.08);border-radius:8px;padding:8px 10px"><span style="font-size:15px">🤝</span> Solidarité : <strong>' + s.solidarite.date + '</strong></div>'
+      : '<div style="margin-top:8px;background:var(--amber-l);border-radius:8px;padding:8px 10px"><span style="font-size:15px">⚠️</span> Solidarité non effectuée</div>';
+    html += '<div class="solde-card ' + (s.positif ? 'positif' : 'negatif') + '"><div style="display:flex;justify-content:space-between"><span class="solde-nom">' + s.nom + '</span><span class="solde-badge ' + (s.positif ? 'positif' : 'negatif') + '">' + s.statut + '</span></div>'
       + '<div class="solde-grid">'
       + '<div class="solde-item"><div class="solde-item-label">Net 2026</div><div class="solde-item-val ' + (parseFloat(s.net2026) >= 0 ? 'positif' : 'negatif') + '">' + s.net2026 + '</div></div>'
       + '<div class="solde-item"><div class="solde-item-label">Report 2025</div><div class="solde-item-val neutral">' + s.report + '</div></div>'
-      + '<div class="solde-item"><div class="solde-item-label">Solde final</div><div class="solde-item-val ' + (s.positif ? 'positif' : 'negatif') + '">' + soldeAdjStr + (detteDA > 0 ? '<div style="font-size:9px;opacity:.7;margin-top:2px">(dont ' + minsToStr2(detteDA) + ' DA)</div>' : '') + '</div></div>'
-      + '</div>'
-      + '<div style="margin-top:10px;font-size:12px;color:var(--text2);display:flex;justify-content:space-between"><span>📅 Mois en cours : <strong>' + s.mois + '</strong></span><span>' + s.jours + '</span></div>'
-      + solHtml + congesHtml + recupHtml + '</div>';
+      + '<div class="solde-item"><div class="solde-item-label">Solde final</div><div class="solde-item-val ' + (s.positif ? 'positif' : 'negatif') + '">' + s.solde + '</div></div>'
+      + '</div>' + solHtml + '</div>';
   }
   const d = new Date(data.timestamp);
-  html += '<div style="text-align:center;font-size:11px;color:var(--text2);margin-top:8px">Dernière sync : ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}) + '</div>';
+  html += '<div style="text-align:center;font-size:11px;color:var(--text2);margin-top:8px">Sync : ' + d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) + '</div>';
   el.innerHTML = html;
-  setStatus('Connecté · ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}));
-}
-function buildAlertes(salaries) {
-  const a = [];
-  for (const s of salaries) {
-    const p = s.solde.replace('-','').split(':');
-    const m = parseInt(p[0])*60 + parseInt(p[1]||0);
-    if (s.solde.startsWith('-') && m > 20*60) a.push({ type: 'danger', msg: s.nom + ' : ' + s.solde + ' d\'heures dues — à régulariser' });
-  }
-  return a;
+  setStatus('Connecté');
 }
 
 // ═══ SEMAINE ═══
@@ -670,31 +541,24 @@ async function loadSemaine(sal) {
   hideSaisie();
   if (!API_URL) { el.innerHTML = '<div class="empty">⚙️ Configurez l\'URL</div>'; return; }
   updateWeekLabel();
-  const ck = 'semaine_' + sal + '_' + myOffset;
-  const cached = CACHE[ck];
-  if (cached && cached.semaine && cached.semaine.length) { try { renderSemaine(cached.semaine, sal); } catch(e) {} }
-  else el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Chargement...</div></div>';
+  el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Chargement...</div></div>';
   const data = await apiGet({ action: 'semaine', salarie: sal, offset: myOffset });
   if (myToken !== semaineLoadToken || sal !== currentSalarie || myOffset !== currentWeekOffset) return;
-  if (!data) { if (!cached) el.innerHTML = '<div class="empty">❌ Délai dépassé</div>'; return; }
-  if (data.error) { if (!cached) el.innerHTML = '<div class="empty">❌ ' + data.error + '</div>'; return; }
-  if (!data.semaine || data.semaine.length === 0) { if (!cached) el.innerHTML = '<div class="empty">📅 Aucune donnée</div>'; return; }
-  CACHE[ck] = data;
-  try { renderSemaine(data.semaine, sal); } catch(e) { el.innerHTML = '<div class="empty">❌ ' + e.message + '</div>'; }
+  if (!data || data.error || !data.semaine) { el.innerHTML = '<div class="empty">❌ ' + (data?.error || 'Erreur') + '</div>'; return; }
+  renderSemaine(data.semaine, sal);
 }
-function renderSemaine(jours, sal = currentSalarie) {
+function renderSemaine(jours, sal) {
+  if (!sal) sal = currentSalarie;
   const el = document.getElementById('semaine-content');
   const parseDur = s => { if (!s || s === '' || s === '0:00') return 0; const n = s.startsWith('-'); const c = s.replace('-',''); const p = c.split(':'); const m = (parseInt(p[0])||0)*60+(parseInt(p[1])||0); return n ? -m : m; };
   const minToStr = m => { const n = m<0, a = Math.abs(m); return (n?'-':'')+Math.floor(a/60)+':'+String(a%60).padStart(2,'0'); };
   let tTrav = 0, tEcart = 0, tMaj = 0, nJ = 0, baseA = ((sal === 'ANTONIO') ? 39 : 35) * 60;
   const baseJ = j => (sal === 'ANTONIO' && j.jour !== 'ven') ? 8 : 7;
-  let aArret = false;
   for (const j of jours) {
     const t = j.type || '', bj = baseJ(j);
     const isT = t === 'Jour Travaillé' || t === 'journee solidarité travaillé';
     const isF = t === 'JOUR FERIE non travaillé';
     const isA = ['CONGE','RTT','ABSENT','ARRET TRAVAIL MALADIE','ARRET MALADIE AVEC SUBROGATION','ARRET MALADIE SANS SUBROGATION','congé sans solde','absences non rémunérées avec retenue sur salaire'].includes(t);
-    if (estTypeMaladie(t)) aArret = true;
     if (isT && j.travaille) { tTrav += parseDur(j.travaille); nJ++; }
     if (isF) { tTrav += bj * 60; nJ++; }
     if (isT && j.ecart) tEcart += parseDur(j.ecart);
@@ -702,14 +566,12 @@ function renderSemaine(jours, sal = currentSalarie) {
   }
   const ex = tTrav - baseA;
   tMaj = (sal === 'ANTONIO') ? 0 : (ex > 0 ? Math.round(ex * 1.25) : 0);
-  const totF = aArret ? (tTrav + tMaj) : (baseA + tMaj);
-  let html = '<div class="card"><div class="card-title" style="display:flex;justify-content:space-between"><span>Cette semaine — cliquez pour saisir</span><span style="font-weight:700;color:var(--blue)">' + sal + '</span></div>';
+  const totF = baseA + tMaj;
+  let html = '<div class="card"><div class="card-title" style="display:flex;justify-content:space-between"><span>Cette semaine — cliquez pour saisir</span><span style="color:var(--blue)">' + sal + '</span></div>';
   const jc = {lun:'Lundi',mar:'Mardi',mer:'Mercredi',jeu:'Jeudi',ven:'Vendredi',sam:'Samedi',dim:'Dimanche'};
   for (const j of jours) {
     const t = j.type || '';
     const isT = t === 'Jour Travaillé' || t === 'journee solidarité travaillé';
-    const isRetenue = isT && j.remarque && j.remarque.startsWith(DA_MARKER) && j.ecart && j.ecart.startsWith('-');
-    const isCompteur = isT && j.remarque && j.remarque.startsWith(COMPTEUR_MARKER) && j.ecart && j.ecart.startsWith('-');
     const rqBadge = buildRemarqueBadge(j.remarque, j.date);
     const imgBadge = buildImageBadge(j.photo, j.date);
     html += '<div class="jour-row ' + typeToClass(t) + ' ' + (j.isToday ? 'today' : '') + '" onclick="openSaisie(' + JSON.stringify(j).replace(/"/g,'&quot;') + ')">'
@@ -719,8 +581,6 @@ function renderSemaine(jours, sal = currentSalarie) {
       + '<div class="jour-type">' + typeLabel(t) + '</div>'
       + (isT && j.travaille && j.travaille !== '0:00' ? '<div class="jour-heures">' + cleanTime(j.travaille) + '</div>' : '')
       + (isT && j.ecart && j.ecart !== '0:00' ? '<div class="jour-ecart ' + (j.ecart.startsWith('-')?'neg':'pos') + '">' + cleanTime(j.ecart) + '</div>' : '')
-      + (isRetenue ? '<div style="font-size:12px;color:var(--red);margin-left:4px" title="Départ anticipé — retenue salaire">💸</div>' : '')
-      + (isCompteur ? '<div style="font-size:12px;color:var(--amber);margin-left:4px" title="Départ anticipé — dette récup">⏳</div>' : '')
       + (rqBadge ? '<div style="font-size:13px;margin-left:6px">' + rqBadge + '</div>' : '')
       + (imgBadge ? '<div style="font-size:13px;margin-left:6px">' + imgBadge + '</div>' : '')
       + '</div>';
@@ -728,7 +588,6 @@ function renderSemaine(jours, sal = currentSalarie) {
   if (nJ > 0) {
     html += '<div style="margin-top:12px;background:var(--blue-l);border-radius:10px;padding:12px"><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px"><div style="text-align:center;background:white;border-radius:8px;padding:8px"><div style="font-size:10px;color:var(--text2)">H. effectuées</div><div style="font-size:17px;font-weight:700;color:var(--blue)">' + minToStr(tTrav) + '</div></div><div style="text-align:center;background:white;border-radius:8px;padding:8px"><div style="font-size:10px;color:var(--text2)">Écart</div><div style="font-size:17px;font-weight:700;color:' + (tEcart>=0?'var(--green)':'var(--red)') + '">' + minToStr(tEcart) + '</div></div>';
     if (sal !== 'ANTONIO') html += '<div style="text-align:center;background:white;border-radius:8px;padding:8px"><div style="font-size:10px;color:var(--text2)">Maj. 25%</div><div style="font-size:17px;font-weight:700">' + minToStr(tMaj) + '</div></div><div style="text-align:center;background:var(--blue);border-radius:8px;padding:8px;grid-column:1/-1"><div style="font-size:10px;color:rgba(255,255,255,.8)">Total</div><div style="font-size:20px;font-weight:700;color:white">' + minToStr(totF) + '</div></div>';
-    else html += '<div style="text-align:center;background:var(--blue);border-radius:8px;padding:8px;grid-column:1/-1"><div style="font-size:10px;color:rgba(255,255,255,.8)">Total</div><div style="font-size:20px;font-weight:700;color:white">' + minToStr(tTrav) + '</div></div>';
     html += '</div></div>';
   }
   el.innerHTML = html + '</div>';
@@ -742,15 +601,14 @@ function afficherRemarque(date, texte) {
     m.onclick = e => { if (e.target === m) m.style.display = 'none'; };
     document.body.appendChild(m);
   }
-  const clean = cleanRemarque(texte);
-  m.innerHTML = '<div style="background:white;border-radius:14px;padding:20px;max-width:320px;width:100%"><div style="display:flex;justify-content:space-between;margin-bottom:10px"><div style="font-size:13px;font-weight:700;color:var(--blue)">💬 Remarque — ' + date + '</div><button onclick="document.getElementById(\'remarque-modal\').style.display=\'none\'" style="background:none;border:none;font-size:18px;color:#999;cursor:pointer">✕</button></div><div style="font-size:14px;color:#263238;line-height:1.5;white-space:pre-wrap">' + clean + '</div></div>';
+  m.innerHTML = '<div style="background:white;border-radius:14px;padding:20px;max-width:320px;width:100%"><div style="display:flex;justify-content:space-between;margin-bottom:10px"><div style="font-weight:700;color:var(--blue)">💬 Remarque — ' + date + '</div><button onclick="document.getElementById(\'remarque-modal\').style.display=\'none\'" style="background:none;border:none;font-size:18px;color:#999;cursor:pointer">✕</button></div><div style="font-size:14px;line-height:1.5;white-space:pre-wrap">' + cleanRemarque(texte) + '</div></div>';
   m.style.display = 'flex';
 }
 
 // ═══ PHOTO ═══
-document.getElementById('f-photo').addEventListener('change', function() {
-  if (!this.files || !this.files[0]) return;
-  const file = this.files[0];
+function previewPhoto(input) {
+  if (!input.files || !input.files[0]) return;
+  const file = input.files[0];
   const reader = new FileReader();
   reader.onload = function(e) {
     const img = new Image();
@@ -769,22 +627,25 @@ document.getElementById('f-photo').addEventListener('change', function() {
       selectedPhotoBase64 = compressed.split(',')[1];
       document.getElementById('photo-img').src = compressed;
       document.getElementById('photo-preview').style.display = 'block';
+      document.getElementById('photo-label').textContent = 'Changer l\'image';
+      document.getElementById('photo-status').style.display = 'block';
       const sizeKB = Math.round(selectedPhotoBase64.length * 0.75 / 1024);
       document.getElementById('photo-name').textContent = file.name + ' · ' + sizeKB + ' Ko';
-      showToast('✅ Aperçu chargé', 1500);
     };
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
-});
+}
 function resetPhotoForm() {
   selectedPhotoBase64 = null;
   const p = document.getElementById('photo-preview');
+  const s = document.getElementById('photo-status');
   const i = document.getElementById('f-photo');
-  const n = document.getElementById('photo-name');
+  const l = document.getElementById('photo-label');
   if (p) p.style.display = 'none';
+  if (s) s.style.display = 'none';
   if (i) i.value = '';
-  if (n) n.textContent = '';
+  if (l) l.textContent = 'Choisir une image';
 }
 
 // ═══ SAISIE ═══
@@ -800,17 +661,10 @@ function openSaisie(jour) {
   document.getElementById('f-fin').value = (jour.fin && jour.fin !== '00:00' && jour.fin !== '') ? jour.fin : ((currentSalarie === 'ANTONIO' && jour.jour !== 'ven') ? '17:00' : '16:00');
   document.getElementById('f-arrivee').value = (jour.arrivee && jour.arrivee !== '00:00' && jour.arrivee !== '') ? jour.arrivee : '08:00';
   const raw = jour.remarque || '';
-  const hasR = raw.startsWith(DA_MARKER);
-  const hasC = raw.startsWith(COMPTEUR_MARKER);
-  selectedDAMode = hasR ? 'retenue' : (hasC ? 'compteur' : null);
+  selectedDAMode = raw.startsWith(DA_MARKER) ? 'retenue' : (raw.startsWith(COMPTEUR_MARKER) ? 'compteur' : null);
   document.querySelectorAll('.da-btn').forEach(b => b.classList.toggle('selected', b.dataset.mode === selectedDAMode));
   document.getElementById('f-remarque').value = cleanRemarque(raw);
   resetPhotoForm();
-  if (jour.photo && jour.photo.thumbUrl) {
-    document.getElementById('photo-img').src = jour.photo.thumbUrl;
-    document.getElementById('photo-preview').style.display = 'block';
-    document.getElementById('photo-name').textContent = 'Photo du ' + jour.date;
-  }
   const isT = jour.type === 'Jour Travaillé' || jour.type === 'journee solidarité travaillé';
   document.getElementById('heures-form').style.display = isT ? 'block' : 'none';
   document.getElementById('da-form').style.display = isT ? 'block' : 'none';
@@ -870,7 +724,6 @@ async function sauvegarder() {
       btn.textContent = 'Enregistrer dans Sheets';
       return;
     }
-    // Envoi photo via POST
     let imgOk = true;
     let imgMsg = '';
     if (selectedPhotoBase64) {
@@ -887,18 +740,13 @@ async function sauvegarder() {
       }
     }
     delete CACHE.solde;
-    delete CACHE.dettesDA;
     Object.keys(CACHE).forEach(k => {
       if (k.startsWith('semaine_' + currentSalarie) || k.startsWith('mensuel_' + currentSalarie) || k === 'recap_' + currentSalarie) delete CACHE[k];
     });
     const dt = ((Date.now() - t0) / 1000).toFixed(1);
-    if (imgOk && selectedPhotoBase64) {
-      showToast('✅ Enregistré avec image (' + dt + 's)', 2500);
-    } else if (!imgOk) {
-      showToast('⚠️ Enregistré SANS image : ' + imgMsg, 6000);
-    } else {
-      showToast('✅ Enregistré (' + dt + 's)', 2500);
-    }
+    if (imgOk && selectedPhotoBase64) showToast('✅ Enregistré avec image (' + dt + 's)', 2500);
+    else if (!imgOk) showToast('⚠️ Enregistré SANS image : ' + imgMsg, 6000);
+    else showToast('✅ Enregistré (' + dt + 's)', 2500);
     hideSaisie();
     loadSemaine(currentSalarie);
   } catch(e) {
@@ -908,273 +756,18 @@ async function sauvegarder() {
   }
 }
 
-// ═══ MENSUEL (simplifié - garde ta logique existante) ═══
-async function loadMensuel() {
-  const myToken = ++mensuelLoadToken;
-  const sal = currentMensSalarie, offset = currentMensMonthOffset;
-  const el = document.getElementById('mensuel-content');
-  if (!API_URL) { el.innerHTML = '<div class="empty">⚙️ Configurez l\'URL</div>'; return; }
-  const ck = 'mensuel_' + sal + '_' + offset;
-  const cached = CACHE[ck];
-  if (cached && cached.mois) {
-    const mn = traduireMois(cached.nomMois || '');
-    document.getElementById('mens-month-label').textContent = mn.charAt(0).toUpperCase() + mn.slice(1);
-    try { renderMensuel(cached.mois, sal, mn, cached.semainesCompletes, cached.recupGlobal, cached.ijssServeur); } catch(e) {}
-  } else el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Chargement...</div></div>';
-  const [d, dS, dR, dI] = await Promise.all([
-    apiGet({ action: 'mois', salarie: sal, offset }),
-    apiGet({ action: 'moisCalendrier', salarie: sal, offset }),
-    apiGet({ action: 'recuperation', salarie: sal }),
-    apiGet({ action: 'ijss', salarie: sal, offset })
-  ]);
-  if (myToken !== mensuelLoadToken || sal !== currentMensSalarie || offset !== currentMensMonthOffset) return;
-  if (!d || !d.ok) { if (!cached) el.innerHTML = '<div class="empty">❌ ' + (d?.error || 'Erreur') + '</div>'; return; }
-  const mn = traduireMois(d.nomMois || '');
-  document.getElementById('mens-month-label').textContent = mn.charAt(0).toUpperCase() + mn.slice(1);
-  if (!d.mois || !d.mois.length) { if (!cached) el.innerHTML = '<div class="empty">📅 Aucune donnée</div>'; return; }
-  const sc = (dS && dS.ok) ? dS.semaines : null;
-  const rg = (dR && dR.ok) ? dR : null;
-  const is = (dI && dI.ok) ? dI : null;
-  CACHE[ck] = Object.assign({}, d, { semainesCompletes: sc, recupGlobal: rg, ijssServeur: is });
-  try { renderMensuel(d.mois, sal, mn, sc, rg, is); } catch(e) { el.innerHTML = '<div class="empty">❌ ' + e.message + '</div>'; }
-}
+// ═══ MENSUEL / RÉCAP / CALENDRIER (placeholders) ═══
+async function loadMensuel() { document.getElementById('mensuel-content').innerHTML = '<div class="empty">Module mensuel en cours de restauration</div>'; }
+async function loadRecap(sal) { document.getElementById('recap-content').innerHTML = '<div class="empty">Module récap en cours de restauration</div>'; }
+async function loadCalendrier() { document.getElementById('calendrier-content').innerHTML = '<div class="empty">Module calendrier en cours de restauration</div>'; }
 
-function renderMensuel(jours, sal, moisNom, semainesCompletes, recupGlobal, ijssServeur) {
-  const el = document.getElementById('mensuel-content');
-  const pd = s => { const [dd, mm, yy] = s.split('/').map(Number); return new Date(yy, mm-1, dd); };
-  const lundiDe = d => { const j = (d.getDay()+6)%7; const l = new Date(d); l.setDate(d.getDate()-j); return l; };
-  const baseJ = d => (sal === 'ANTONIO' && d.getDay() !== 5) ? 8*60 : 7*60;
-  const parseDur = s => { if (!s || s === '' || s === '0:00' || s === '0:00:00') return 0; const n = s.startsWith('-'); const c = s.replace('-',''); const p = c.split(':'); const m = (parseInt(p[0])||0)*60+(parseInt(p[1])||0); return n ? -m : m; };
-  const semaines = {};
-  if (semainesCompletes && semainesCompletes.length) {
-    for (const s of semainesCompletes) { const l = new Date(s.monday + 'T00:00:00'); const ls = (s.jours || []).filter(Boolean); if (ls.length) semaines[l.getTime()] = ls; }
-  } else {
-    for (const j of jours) { const k = lundiDe(pd(j.date)).getTime(); if (!semaines[k]) semaines[k] = []; semaines[k].push(j); }
-  }
-  const moisAff = jours.length ? pd(jours[0].date).getMonth() : null;
-  const pad2 = n => String(n).padStart(2,'0');
-  const jn = ['dim','lun','mar','mer','jeu','ven','sam'];
-  for (const k in semaines) {
-    const l = new Date(Number(k));
-    const dj = new Set(semaines[k].map(j => j.date));
-    for (const o of [5,6]) { const d = new Date(l); d.setDate(d.getDate()+o); const ds = pad2(d.getDate())+'/'+pad2(d.getMonth()+1)+'/'+d.getFullYear(); if (!dj.has(ds) && estFerieDate(d)) semaines[k].push({ date: ds, jour: jn[d.getDay()], type: 'JOUR FERIE non travaillé', travaille: '', ecart: '' }); }
-    semaines[k].sort((a,b) => pd(a.date) - pd(b.date));
-  }
-  let tTrav = 0, tEcart = 0, tM25 = 0, tAssim = 0, tM50 = 0, tBase = 0, dedDA = 0, detteRecupMin = 0;
-  let nRtt = 0, nConge = 0, nMal = 0, nMalAvecSub = 0, nMalSansSub = 0, nAbsNR = 0, nCSS = 0, nFer = 0;
-  let rows = '';
-  for (const k of Object.keys(semaines).map(Number).sort((a,b) => a-b)) {
-    const js = semaines[k];
-    let wTrav = 0, wBase = 0, wAssim = 0, wBaseM = 0, wTravHS = 0, wFer = 0, wRtt = 0, wCong = 0, wMal = false;
-    for (const j of js) {
-      const t = j.type || '';
-      const dL = pd(j.date);
-      const duMois = (moisAff === null) || (dL.getMonth() === moisAff);
-      const isT = t === 'Jour Travaillé' || t === 'journee solidarité travaillé';
-      const isW = t === 'week end';
-      const cgF = (t === 'CONGE' || t === 'congé sans solde') && estFerieDate(dL);
-      const isC = (t === 'CONGE' || t === 'congé sans solde') && !cgF;
-      const isR = t === 'RTT';
-      const isM = estTypeMaladie(t);
-      const isA = t === 'ABSENT' || isM || t === 'absences non rémunérées avec retenue sur salaire';
-      const isF = t === 'JOUR FERIE non travaillé' || cgF;
-      let cls = '';
-      if (isW) cls = 'weekend'; else if (j.isToday) cls = 'today-row'; else if (isC) cls = 'conge'; else if (isR) cls = 'rtt'; else if (isA) cls = 'absent'; else if (isF) cls = 'ferie';
-      if (duMois) {
-        if (isT) {
-          if (j.travaille) tTrav += parseDur(j.travaille);
-          if (j.ecart) tEcart += parseDur(j.ecart);
-          if (j.ecart && j.remarque) {
-            const e = parseDur(j.ecart);
-            if (e < 0) {
-              if (j.remarque.startsWith(DA_MARKER)) dedDA += -e;
-              else if (j.remarque.startsWith(COMPTEUR_MARKER)) detteRecupMin += -e;
-            }
-          }
-        }
-        if (t === 'ABSENT' || t === 'absences non rémunérées avec retenue sur salaire') nAbsNR++;
-        if (t === 'congé sans solde' && !cgF) nCSS++;
-        if (isM) nMal++;
-        if (estMaladieAvecSubrogation(t)) nMalAvecSub++;
-        if (estMaladieSansSubrogation(t)) nMalSansSub++;
-        if (isR) nRtt++;
-        if (isC) nConge++;
-        if (isF) nFer++;
-      }
-      const dJ = pd(j.date);
-      if (dJ.getDay() !== 0 && dJ.getDay() !== 6) {
-        const bj = baseJ(dJ);
-        if (isM) wMal = true;
-        if (t === 'Jour Travaillé' && j.travaille) { const x = parseDur(j.travaille); wTrav += x; wTravHS += x; }
-        if (t === 'journee solidarité travaillé' && j.travaille) { const x = parseDur(j.travaille); wTrav += x; wTravHS += x; }
-        if (estAssimile(t)) {
-          wAssim += bj; wBase += bj;
-          if (isF) wFer += bj; else if (isR) wRtt += bj; else if (isC) { wCong += bj; wTravHS += bj; }
-          if (duMois) { tAssim += bj; wBaseM += bj; }
-        } else if (estNeutralise(t)) {
-        } else if (t !== 'week end') {
-          wBase += bj;
-          if (duMois) wBaseM += bj;
-        }
-      }
-      const [dd, mm] = j.date.split('/');
-      const jc = j.jour ? j.jour.substring(0,3) : '';
-      const tS = isT && j.travaille ? cleanTime(j.travaille) : '—';
-      const eS = isT && j.ecart && j.ecart !== '0:00' ? cleanTime(j.ecart) : '—';
-      const eC = (isT && j.ecart && j.ecart !== '0:00') ? (j.ecart.startsWith('-') ? ' ecart-neg' : ' ecart-pos') : '';
-      if (duMois) {
-        rows += '<tr class="' + cls + '"><td><strong>' + dd + '/' + mm + '</strong></td><td>' + jc + '</td><td style="font-size:9px">' + (buildTooltip(t) || typeLabelCourt(t)) + '</td><td class="mens-trav-col">' + tS + '</td><td class="mens-ecart-col' + eC + '">' + eS + '</td>' + (sal !== 'ANTONIO' ? '<td style="color:#B0BEC5">—</td>' : '') + '<td></td></tr>';
-      }
-    }
-    const wPrise = wTrav + wAssim;
-    let w25 = 0, w50 = 0, wTot = 0;
-    if (sal === 'ANTONIO') { wTot = wPrise; }
-    else {
-      const S_HS = 35*60, S_50 = 43*60;
-      if (wTravHS > S_HS) { const h25 = Math.min(wTravHS, S_50) - S_HS; const h50 = Math.max(0, wTravHS - S_50); w25 = Math.round(Math.max(0,h25)*1.25); w50 = Math.round(h50*1.5); }
-      wTot = wMal ? wPrise : wBase;
-    }
-    const wRec = w25 + w50;
-    const v = new Date(k); v.setDate(v.getDate()+4);
-    const hsMois = (v.getMonth() === moisAff);
-    if (hsMois) { tM25 += w25; tM50 += w50; }
-    tBase += wBaseM;
-    const l = new Date(k), fs = new Date(k); fs.setDate(fs.getDate()+6);
-    const f = d => pad2(d.getDate())+'/'+pad2(d.getMonth()+1);
-    const eS = wPrise - wBase;
-    const nC = sal !== 'ANTONIO' ? 7 : 6;
-    const st = wMal ? 'sem-warn' : eS >= 0 ? 'sem-ok' : eS >= -30 ? 'sem-warn' : 'sem-alert';
-    rows += '<tr class="semaine-total ' + st + '"><td colspan="3" style="text-align:left">▶ Sem. ' + f(l) + ' → ' + f(fs) + '</td><td>' + minsToStr2(wTrav) + '</td><td class="' + (eS>=0?'ecart-pos':'ecart-neg') + '">' + minsToStr2(eS) + '</td>' + (sal !== 'ANTONIO' ? '<td>' + (hsMois ? minsToStr2(wRec) : '—') + '</td>' : '') + '<td class="fort">' + minsToStr2(wTot) + '</td></tr>';
-  }
-  const BM = Math.round((sal === 'ANTONIO' ? 39 : 35) * 52 / 12 * 60);
-  const hJ = (sal === 'ANTONIO' ? 8 : 7) * 60;
-  const dM = (nAbsNR + nCSS) * hJ;
-  const cM = nConge * hJ;
-  const nbLeg = nMal - nMalAvecSub - nMalSansSub;
-  const dMal = (nbLeg + nMalSansSub) * hJ;
-  let ij = { ijss: 0, maintien: 0 };
-  if (ijssServeur && ijssServeur.ok) ij = { ijss: strToMin(ijssServeur.ijss), maintien: strToMin(ijssServeur.maintien) };
-  const aT = tTrav > 0;
-  const aJ = (nRtt > 0) || (nFer > 0) || (nMalAvecSub > 0);
-  const totPaye = (aT || aJ) ? Math.max(0, BM - dM - cM - dMal - dedDA + ij.ijss + ij.maintien) : 0;
-  window.__lastMensuelArgs = [jours, sal, moisNom, semainesCompletes, recupGlobal, ijssServeur];
-  const header = sal === 'ANTONIO'
-    ? '<tr><th>Date</th><th>Jour</th><th>Type</th><th>Travaillé</th><th>Écart</th><th>Total sem.</th></tr>'
-    : '<tr><th>Date</th><th>Jour</th><th>Type</th><th>Travaillé</th><th>Écart</th><th>Récup.</th><th>Total sem.</th></tr>';
-  let html = '<div class="card" style="overflow-x:auto"><div style="display:flex;justify-content:space-between;margin-bottom:10px"><span style="font-weight:700;font-size:15px;color:var(--blue)">' + sal + '</span><span style="font-weight:600;font-size:13px;color:var(--text2)">' + moisNom.charAt(0).toUpperCase() + moisNom.slice(1) + '</span></div><table class="mens-table">' + header + rows + '</table></div>';
-  html += '<div class="card" style="margin-top:10px;border-left:4px solid var(--blue)"><div class="card-title" style="color:var(--blue)">💰 Compteur paie</div><div style="background:#F8FBFF;border-radius:10px;padding:14px 16px"><div style="display:flex;justify-content:space-between"><span style="font-size:13px;color:var(--text2);font-weight:600">= Base mensuelle</span><span style="font-size:18px;font-weight:700;color:var(--blue)">' + minsToStr2(BM) + '</span></div><div style="display:flex;justify-content:space-between;align-items:center;background:var(--blue);border-radius:8px;padding:10px 12px;margin-top:10px"><span style="font-size:12px;color:rgba(255,255,255,.85);font-weight:600">Salaire employeur</span><span style="font-size:20px;font-weight:700;color:white">' + minsToStr2(totPaye) + '</span></div></div></div>';
-  el.innerHTML = html;
-}
-
-// ═══ RÉCAP (simplifié) ═══
-async function loadRecap(sal) {
-  const myToken = ++recapLoadToken;
-  const el = document.getElementById('recap-content');
-  if (!API_URL) { el.innerHTML = '<div class="empty">⚙️ Configurez l\'URL</div>'; return; }
-  const ck = 'recap_' + sal;
-  const cached = CACHE[ck];
-  if (cached) { try { renderRecap(sal, cached.data, cached.solData, cached.datesTypes); } catch(e) {} }
-  else el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Chargement...</div></div>';
-  const [d, s, dt] = await Promise.all([
-    apiGet({ action: 'recap', salarie: sal }),
-    apiGet({ action: 'solidarite', salarie: sal }),
-    apiGet({ action: 'dates_types', salarie: sal })
-  ]);
-  if (myToken !== recapLoadToken || sal !== currentRecapSal) return;
-  if (!d || d.error) { if (!cached) el.innerHTML = '<div class="alerte danger">❌ ' + (d?.error || 'Erreur') + '</div>'; return; }
-  CACHE[ck] = { data: d, solData: s, datesTypes: dt };
-  renderRecap(sal, d, s, dt);
-}
-function renderRecap(sal, data, solData, datesTypes) {
-  const el = document.getElementById('recap-content');
-  const isA = data.isAntonio || sal === 'ANTONIO';
-  let html = '<div class="card" style="margin-bottom:10px;text-align:center"><div style="font-size:16px;font-weight:700;color:var(--blue)">' + sal + '</div><div style="font-size:11px;color:var(--text2);text-transform:uppercase">Récap annuel 2026</div></div>';
-  html += '<div class="card" style="overflow-x:auto"><table class="recap-table"><thead><tr>';
-  if (!isA) html += '<th>Mois</th><th>H.Sup Maj.</th><th>J.RTT</th><th>J.Abs</th><th>Congés</th>';
-  else html += '<th>Mois</th><th>J.Abs</th><th>H.Abs</th><th>J.W-E</th><th>H.W-E</th><th>Congés</th>';
-  html += '</tr></thead><tbody>';
-  for (const m of data.mois) {
-    html += '<tr>';
-    if (!isA) html += '<td><strong>' + m.mois + '</strong></td><td>' + (m.hSupMaj || '—') + '</td><td>' + (m.jRtt > 0 ? m.jRtt + 'j' : '—') + '</td><td>' + (m.jAbsent > 0 ? m.jAbsent + 'j' : '—') + '</td><td>' + (m.conges > 0 ? m.conges + 'j' : '—') + '</td>';
-    else html += '<td><strong>' + m.mois + '</strong></td><td>' + (m.jAbsent > 0 ? m.jAbsent + 'j' : '—') + '</td><td>' + (m.hAbsent && m.hAbsent !== '0:00' ? m.hAbsent : '—') + '</td><td>' + (m.jWeTrav > 0 ? m.jWeTrav + 'j' : '—') + '</td><td>' + (m.hWeTrav && m.hWeTrav !== '0:00' ? m.hWeTrav : '—') + '</td><td>' + (m.conges > 0 ? m.conges + 'j' : '—') + '</td>';
-    html += '</tr>';
-  }
-  html += '</tbody></table></div>';
-  el.innerHTML = html;
-}
-
-// ═══ CALENDRIER ═══
-async function loadCalendrier() {
-  const myToken = ++calLoadToken;
-  const el = document.getElementById('calendrier-content');
-  if (!API_URL) { el.innerHTML = '<div class="empty">⚙️ Configurez l\'URL</div>'; return; }
-  const now = new Date();
-  const target = new Date(now.getFullYear(), now.getMonth() + currentCalMonthOffset, 1);
-  const month = target.getMonth();
-  document.getElementById('cal-month-label').textContent = traduireMois(target.toLocaleDateString('en-US', {month:'long', year:'numeric'}));
-  el.innerHTML = '<div class="loader"><div class="spinner"></div><div class="loader-text">Chargement...</div></div>';
-  const ck = 'cal_' + currentCalSalarie + '_' + currentCalMonthOffset;
-  let data = CACHE[ck];
-  if (!data) { data = await apiGet({ action: 'moisCalendrier', salarie: currentCalSalarie, offset: currentCalMonthOffset }); if (data && data.ok) CACHE[ck] = data; }
-  if (myToken !== calLoadToken) return;
-  if (!data || !data.ok) { el.innerHTML = '<div class="empty">❌ ' + (data?.error || 'Erreur') + '</div>'; return; }
-  const wd = data.semaines.map(s => ({ monday: new Date(s.monday + 'T00:00:00'), jours: s.jours || [] }));
-  renderCalendrier(wd, month);
-}
-function renderCalendrier(weeksData, month) {
-  const jn = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
-  const ml = document.getElementById('cal-month-label')?.textContent || '';
-  let html = '<div class="card"><div style="text-align:center;margin-bottom:10px"><div style="font-size:16px;font-weight:700;color:var(--blue)">' + currentCalSalarie + '</div><div style="font-size:12px;color:var(--text2)">' + ml + '</div></div>';
-  html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">';
-  for (const j of jn) html += '<div class="cal-head">' + j + '</div>';
-  for (const week of weeksData) {
-    for (let i = 0; i < 7; i++) {
-      const dt = new Date(week.monday); dt.setDate(dt.getDate() + i);
-      const inM = dt.getMonth() === month;
-      const fW = estFerieDate(dt);
-      const j = week.jours[i];
-      let bg = '#F5F7FA';
-      if (j && j.type) bg = natureOf(j.type).couleur;
-      else if (fW) bg = '#FFF9C4';
-      html += '<div class="cal-cell" style="background:' + bg + ';opacity:' + (inM ? 1 : 0.4) + '"><div class="cal-daynum">' + dt.getDate() + '</div></div>';
-    }
-  }
-  html += '</div></div>';
-  document.getElementById('calendrier-content').innerHTML = html;
-}
-
-// ═══ PDF / CAPTURES (versions courtes) ═══
-async function telechargerPdfSolde() { showToast('⚠️ Fonction PDF désactivée (version simplifiée)', 3000); }
-async function telechargerPdfSalarie() { showToast('⚠️ Fonction PDF désactivée', 3000); }
-async function telechargerPdfMensuel() { showToast('⚠️ Fonction PDF désactivée', 3000); }
-async function telechargerPdfCalendrier() { showToast('⚠️ Fonction PDF désactivée', 3000); }
-async function captureSolde() { showToast('⚠️ Capture désactivée', 3000); }
-async function captureSemaine() { showToast('⚠️ Capture désactivée', 3000); }
-async function captureMensuel() { showToast('⚠️ Capture désactivée', 3000); }
-async function captureRecap() { showToast('⚠️ Capture désactivée', 3000); }
-async function captureCalendrier() { showToast('⚠️ Capture désactivée', 3000); }
-
-function calculerConges() {
-  const sal = document.getElementById('cc-salarie').value;
-  const ds = document.getElementById('cc-debut').value, fs = document.getElementById('cc-fin').value;
-  const el = document.getElementById('cc-resultat');
-  if (!ds || !fs) { el.innerHTML = '<div style="color:var(--red);font-size:12px">Saisir les dates</div>'; return; }
-  const debut = new Date(ds + 'T00:00:00'), fin = new Date(fs + 'T00:00:00');
-  if (fin < debut) { el.innerHTML = '<div style="color:var(--red);font-size:12px">Fin après début</div>'; return; }
-  let jO = 0, jF = 0, jOuv = 0;
-  const d = new Date(debut);
-  while (d <= fin) { const w = d.getDay(); if (w !== 0) jOuv++; if (w >= 1 && w <= 5) { if (estFerieDate(d)) jF++; else jO++; } d.setDate(d.getDate() + 1); }
-  let hD = 0; const d2 = new Date(debut);
-  while (d2 <= fin) { const w = d2.getDay(); if (w >= 1 && w <= 5 && !estFerieDate(d2)) hD += (sal === 'ANTONIO' && w !== 5) ? 8*60 : 7*60; d2.setDate(d2.getDate() + 1); }
-  el.innerHTML = '<div style="background:#F8FBFF;border-radius:10px;padding:14px 16px"><div style="display:flex;justify-content:space-between"><span>Jours ouvrables</span><strong>' + jOuv + ' j.</strong></div><div style="display:flex;justify-content:space-between;margin-top:6px"><span>Jours ouvrés</span><strong>' + jO + ' j.</strong></div><div style="border-top:1px dashed #B0BEC5;margin:10px 0"></div><div style="display:flex;justify-content:space-between;background:var(--blue);color:white;padding:10px;border-radius:8px"><span>Heures à déduire</span><strong>' + minsToStr2(hD) + '</strong></div></div>';
-}
-
+// ═══ CONFIG ═══
 async function saveConfig() {
   const u = document.getElementById('api-url').value.trim();
   if (!u) { showToast('❌ URL vide'); return; }
-  API_URL = u; showToast('Test de connexion...');
+  API_URL = u;
   const r = await apiGet({ action: 'ping' });
-  if (r && r.ok) { localStorage.setItem('deo_api_url', u); showToast('✅ Connecté !'); setStatus('Connecté'); loadSolde(); }
+  if (r && r.ok) { localStorage.setItem('deo_api_url', u); showToast('✅ Connecté !'); loadSolde(); }
   else showToast('❌ Échec');
 }
 function reinitialiserConfig() { localStorage.removeItem('deo_api_url'); API_URL = API_URL_DEFAUT; document.getElementById('api-url').value = API_URL; showToast('↺ Restauré'); loadSolde(); }
@@ -1187,6 +780,7 @@ function refreshAll() {
   if (a === 'page-calendrier') loadCalendrier();
   showToast('🔄 Actualisation...');
 }
+
 window.addEventListener('load', async () => {
   setStatus('Connexion...');
   await loadSolde();
